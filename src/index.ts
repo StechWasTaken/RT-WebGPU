@@ -1,5 +1,6 @@
 import squareShader from "./shaders/square.wgsl";
-import square from "./shapes/square.js";
+import raytracingShader from "./shaders/raytracing.wgsl";
+import square from "./shapes/square";
 
 if (!navigator.gpu) {
     throw new Error("WebGPU not supported on this browser.");
@@ -33,6 +34,17 @@ const uniformBuffer = device.createBuffer({
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 
+const spheres = new Array<Sphere>();
+
+spheres.push({
+    center: {
+        x: 0,
+        y: 0,
+        z: 0,
+    },
+    r: 1,
+});
+
 device.queue.writeBuffer(uniformBuffer, 0, canvasDimensions);
 
 const vertexBuffer = device.createBuffer({
@@ -43,7 +55,7 @@ const vertexBuffer = device.createBuffer({
 
 device.queue.writeBuffer(vertexBuffer, 0, square);
 
-const vertexBufferLayout = {
+const vertexBufferLayout: GPUVertexBufferLayout = {
     arrayStride: 8,
     attributes: [{
         format: "float32x2",
@@ -54,7 +66,7 @@ const vertexBufferLayout = {
 
 const squareShaderModule = device.createShaderModule({
     label: "square shader",
-    code: squareShader,
+    code: raytracingShader,
 });
 
 const bindGroupLayout = device.createBindGroupLayout({

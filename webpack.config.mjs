@@ -9,11 +9,21 @@ export default {
                 test: /\.wgsl$/,
                 use: 'raw-loader',
             },
+            {
+                test: /\.ts$/,
+                use: 'ts-loader',
+                exclude: /node_modules/,
+            }
         ],
     },
 
+    resolve: {
+        extensions: ['.tsx', '.ts', '.js'],
+    },
+
     devServer: {
-        static: './',
+        static: path.resolve(process.cwd(), 'dist'),
+        compress: true,
         hot: true,
     },
 

@@ -2,7 +2,7 @@
   "name": "rt-webgpu",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/index.ts",
   "private": true,
   "scripts": {
     "start": "webpack serve --hot --mode development",
@@ -14,6 +14,7 @@
     "@webgpu/types": "^0.1.46",
     "html-webpack-plugin": "^5.6.0",
     "raw-loader": "^4.0.2",
+    "ts-loader": "^9.5.1",
     "webpack": "^5.94.0",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^5.1.0"

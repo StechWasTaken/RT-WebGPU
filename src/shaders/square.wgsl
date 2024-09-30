@@ -2,7 +2,11 @@
 
 @vertex
 fn vertexMain(@location(0) pos: vec2f) -> @builtin(position) vec4f {
-    return vec4f(pos, 0, 1);
+    let height = canvas.y;
+    let width = canvas.x;
+    let ratio = height / width;
+    let output = vec4f(pos.x * ratio, pos.y, 0, 1);
+    return output;
 }
 
 @fragment
