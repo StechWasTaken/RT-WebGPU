@@ -54,11 +54,8 @@ const bindGroupLayout = device.createBindGroupLayout({
 });
 
 const canvasDimensions = new Float32Array([canvasWidth, canvasHeight]);
-const time = Date.now().toString();
-const index = Math.floor(time.length / 2);
-const part1 = parseInt(time.slice(0, index));
-const part2 = parseInt(time.slice(index));
-const randomValues = new Float32Array([part1, part2]);
+const seed = Date.now();
+const randomValues = new Float32Array([seed]);
 
 console.log(randomValues);
 
@@ -80,7 +77,7 @@ spheres.push({
     center: {
         x: 0,
         y: 0,
-        z: -1,
+        z: -1.2,
     },
     r: 0.5,
 });
@@ -92,6 +89,24 @@ spheres.push({
         z: -1,
     },
     r: 100,
+});
+
+spheres.push({
+    center: {
+        x: 1.0,
+        y: 0,
+        z: -1,
+    },
+    r: 0.5,
+});
+
+spheres.push({
+    center: {
+        x: -1.0,
+        y: 0,
+        z: -1,
+    },
+    r: 0.5,
 });
 
 const info = BufferFactory.prepareForBuffer(spheres);
@@ -147,9 +162,6 @@ const squareRenderPipeline = device.createRenderPipeline({
             format: canvasFormat,
         }],
     },
-    multisample: {
-        count: 4,
-    },
 });
 
 const bindGroup = device.createBindGroup({
@@ -179,21 +191,9 @@ const bindGroup = device.createBindGroup({
 
 const encoder = device.createCommandEncoder();
 
-const canvasTexture = context.getCurrentTexture();
-
-let multisampleTexture: GPUTexture;
-
-multisampleTexture = device.createTexture({
-    format: canvasTexture.format,
-    usage: GPUTextureUsage.RENDER_ATTACHMENT,
-    size: [canvasTexture.width, canvasTexture.height],
-    sampleCount: 4,
-});
-
 const pass = encoder.beginRenderPass({
     colorAttachments: [{
-        view: multisampleTexture.createView(),
-        resolveTarget: canvasTexture.createView(),
+        view: context.getCurrentTexture().createView(),
         loadOp: "clear",
         storeOp: "store",
     }]
