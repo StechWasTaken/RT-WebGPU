@@ -30,7 +30,13 @@ struct HitRecord {                              //              align(16)   size
 
 const CAMERA_CENTER = vec3f(0, 0, 0);
 const MAX_BOUNCES = 50;
-const SAMPLES_PER_PIXEL = 100;
+const SAMPLES_PER_PIXEL = 500;
+const FIELD_OF_VIEW = 90;
+const LOOK_FROM = vec3f(-2,2,1);
+const LOOK_AT = vec3f(0,0,-1);
+const V_UP = vec3f(0,1,0);
+const DEFOCUS_ANGLE = 0.6;
+const FOCUS_DISTANCE = 10;
 
 fn lcg(modulus: u32, a: u32, c: u32, seed: ptr<function, u32>) -> u32 {
     let result = (a * (*seed) + c) % modulus;
@@ -63,7 +69,18 @@ fn randomUnitVector(seed: ptr<function, u32>) -> vec3f {
         }
     }
     return q / sqrt(lensq);
-} 
+}
+
+fn randomInUnitDisk(seed: ptr<function, u32>) -> vec3f {
+    var p: vec3f;
+    while (true) {
+        p = vec3f(randomRange(seed, -1, 1), randomRange(seed, -1, 1), 0);
+        if (dot(p, p) < 1) {
+            break;
+        }
+    }
+    return p;
+}
 
 fn randomOnHemisphere(normal: vec3f, seed: ptr<function, u32>) -> vec3f {
     let onUnitSphere = randomUnitVector(seed);
@@ -90,22 +107,38 @@ fn getRay(pos: vec2f, seed: ptr<function, u32>) -> Ray {
     let canvasWidth = canvas.x;
     let ratio = canvasHeight / canvasWidth;
 
-    let focalLength = 1.0;
-    let viewportHeight = 2.0;
+    let center = LOOK_FROM;
+
+    let theta = radians(FIELD_OF_VIEW);
+    let h = tan(theta / 2);
+    let viewportHeight = 2 * h * FOCUS_DISTANCE;
     let viewportWidth = viewportHeight * (f32(canvasWidth) / canvasHeight);
+
+    let w = normalize(LOOK_FROM - LOOK_AT);
+    let u = normalize(cross(V_UP, w));
+    let v = cross(w, u);
     
-    let viewportU = vec3f(viewportWidth, 0, 0);
-    let viewportV = vec3f(0, -viewportHeight, 0);
+    let viewportU = viewportWidth * u;
+    let viewportV = viewportHeight * -v;
 
     let pixelDeltaU = viewportU / canvasWidth;
     let pixelDeltaV = viewportV / canvasHeight;
 
-    let viewportUpperLeft = CAMERA_CENTER - vec3f(0, 0, focalLength) - viewportU/2 - viewportV/2;
+    let viewportUpperLeft = center - (FOCUS_DISTANCE * w) - viewportU / 2 - viewportV / 2;
     let pixel00Location = viewportUpperLeft + 0.5 * (pixelDeltaU + pixelDeltaV);
+
+    let defocusRadius = FOCUS_DISTANCE * tan(radians(DEFOCUS_ANGLE / 2));
+    let defocusDiskU = u * defocusRadius;
+    let defocusDiskV = v * defocusRadius;
 
     let offset = sampleSquare(seed);
     let pixelSample = pixel00Location + ((pos.x + offset.x) * pixelDeltaU) + ((pos.y + offset.y) * pixelDeltaV);
-    let rayOrigin = CAMERA_CENTER;
+    var rayOrigin: vec3f;
+    if (DEFOCUS_ANGLE <= 0) {
+        rayOrigin = center;
+    } else {
+        rayOrigin = defocusDiskSample(seed, center, defocusDiskU, defocusDiskV);
+    }
     let rayDirection = pixelSample - rayOrigin;
 
     return Ray(rayOrigin, rayDirection);
@@ -113,6 +146,11 @@ fn getRay(pos: vec2f, seed: ptr<function, u32>) -> Ray {
 
 fn sampleSquare(seed: ptr<function, u32>) -> vec3f {
     return vec3f(random(seed) - 0.5, random(seed) - 0.5, 0);
+}
+
+fn defocusDiskSample(seed: ptr<function, u32>, center: vec3f, defocusDiskU: vec3f, defocusDiskV: vec3f) -> vec3f {
+    let p = randomInUnitDisk(seed);
+    return center + (p.x * defocusDiskU) + (p.y * defocusDiskV);
 }
 
 fn at(ray: Ray, t: f32) -> vec3f {
