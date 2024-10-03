@@ -2,6 +2,10 @@ import squareShader from "./shaders/square.wgsl";
 import raytracingShader from "./shaders/raytracing.wgsl";
 import square from "./shapes/square";
 import BufferFactory from "./helpers/bufferFactory";
+import MaterialFactory from "./helpers/materialFactory";
+import SphereFactory from "./helpers/sphereFactory";
+import RandomHelper from "./helpers/randomHelper";
+import VectorHelper from "./helpers/vectorHelper";
 
 if (!navigator.gpu) {
     throw new Error("WebGPU not supported on this browser.");
@@ -68,17 +72,17 @@ const padding8b: Vector2 = {
 
 const camera: Camera = {
     lookFrom: {
-        x:  0,
-        y:  0,
-        z: -2,
+        x: 13,
+        y:  2,
+        z:  3,
     },
-    fvov: 90,
+    fvov: 20,
     lookAt: {
         x:  0,
         y:  0,
-        z: -1,
+        z:  0,
     },
-    defocusAngle: 0.01,
+    defocusAngle: 0.6,
     vup: {
         x:  0,
         y:  1,
@@ -90,115 +94,57 @@ const camera: Camera = {
     imageHeight: canvas.height,
 }
 
-const materialCenter: Material = {
-    albedo: {
-        x: 0.1,
-        y: 0.2,
-        z: 0.5,
-    },
-    fuzz: 0,
-    refractionIndex: 1.0,
-    materialIndex: 1,
-    padding: padding8b,
+const groundMaterial = MaterialFactory.createLambertian({x: 0.5, y: 0.5, z: 0.5});
+spheres.push(SphereFactory.createSphere(0,-1000,0,1000,groundMaterial));
+
+const range = 11;
+
+for (let a = -range; a < range; a++) {
+    for (let b = -range; b < range; b++) {
+        const chooseMaterial = RandomHelper.random();
+        const center: Vector3 = {
+            x: a + 0.9 * RandomHelper.random(),
+            y: 0.2,
+            z: b + 0.9 * RandomHelper.random(),
+        }
+
+        if (VectorHelper.magnitude(VectorHelper.subtract(center, {x:4,y:0.2,z:0})) > 0.9) {
+            if (chooseMaterial < 0.8) { // diffuse
+                const albedo = VectorHelper.multiply(RandomHelper.randomVector3(), RandomHelper.randomVector3());
+                const material = MaterialFactory.createLambertian(albedo);
+                const sphere = SphereFactory.createSphere(center.x, center.y, center.z, 0.2, material);
+                spheres.push(sphere);
+            }
+            else if (chooseMaterial < 0.95) { // metal
+                const albedo: Vector3 = {
+                    x: RandomHelper.randomRange(0.5, 1),
+                    y: RandomHelper.randomRange(0.5, 1),
+                    z: RandomHelper.randomRange(0.5, 1),
+                }
+                const fuzz = RandomHelper.randomRange(0, 0.5);
+                const material = MaterialFactory.createMetal(albedo, fuzz);
+                const sphere = SphereFactory.createSphere(center.x, center.y, center.z, 0.2, material);
+                spheres.push(sphere);
+            }
+            else { // glass
+                const material = MaterialFactory.createDielectric(1.5);
+                const sphere = SphereFactory.createSphere(center.x, center.y, center.z, 0.2, material);
+                spheres.push(sphere);
+            }
+        }
+    }
 }
 
-const materialGround: Material = {
-    albedo: {
-        x: 0.8,
-        y: 0.8,
-        z: 0.0,
-    },
-    fuzz: 0,
-    refractionIndex: 1.0,
-    materialIndex: 1,
-    padding: padding8b,
-}
+const material1 = MaterialFactory.createDielectric(1.5);
+spheres.push(SphereFactory.createSphere(0,1,0,1,material1));
 
-const materialLeft: Material = {
-    albedo: {
-        x: 0.8,
-        y: 0.8,
-        z: 0.8,
-    },
-    fuzz: 0.3,
-    refractionIndex: 1.5,
-    materialIndex: 3,
-    padding: padding8b,
-}
+const material2 = MaterialFactory.createLambertian({x: 0.4, y: 0.2, z: 0.1});
+spheres.push(SphereFactory.createSphere(-4,1,0,1,material2));
 
-const materialBubble: Material = {
-    albedo: {
-        x: 0.8,
-        y: 0.8,
-        z: 0.8,
-    },
-    fuzz: 0.3,
-    refractionIndex: 1.0 / 1.5,
-    materialIndex: 3,
-    padding: padding8b,
-}
+const material3 = MaterialFactory.createMetal({x: 0.7, y: 0.6, z: 0.5}, 0.0);
+spheres.push(SphereFactory.createSphere(4,1,0,1,material3));
 
-const materialRight: Material = {
-    albedo: {
-        x: 0.8,
-        y: 0.6,
-        z: 0.2,
-    },
-    fuzz: 1.0,
-    refractionIndex: 1.0,
-    materialIndex: 2,
-    padding: padding8b,
-}
-
-spheres.push({
-    center: {
-        x: 0,
-        y: 0,
-        z: -1.2,
-    },
-    r: 0.5,
-    material: materialCenter,
-});
-
-spheres.push({
-    center: {
-        x: 0,
-        y: -100.5,
-        z: -1,
-    },
-    r: 100,
-    material: materialGround,
-});
-
-spheres.push({
-    center: {
-        x: 1.0,
-        y: 0,
-        z: -1,
-    },
-    r: 0.5,
-    material: materialRight,
-});
-
-spheres.push({
-    center: {
-        x: -1.0,
-        y: 0,
-        z: -1.0,
-    },
-    r: 0.4,
-    material: materialBubble,
-});
-
-spheres.push({
-    center: {
-        x: -1.0,
-        y: 0,
-        z: -1,
-    },
-    r: 0.5,
-    material: materialLeft,
-});
+console.log(spheres.length);
 
 const spheresInfo = BufferFactory.prepareForBuffer(spheres);
 const bufferReadySpheres = new Float32Array(spheresInfo.data);

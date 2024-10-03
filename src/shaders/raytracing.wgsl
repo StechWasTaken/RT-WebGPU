@@ -39,8 +39,8 @@ struct Camera {                                 //              align(16)   size
 @group(0) @binding(1) var<storage, read> spheres: array<Sphere>;
 @group(0) @binding(2) var<uniform> rng: u32;
 
-const MAX_BOUNCES = 50;
-const SAMPLES_PER_PIXEL = 50;
+const MAX_BOUNCES = 30;
+const SAMPLES_PER_PIXEL = 30;
 
 fn lcg(modulus: u32, a: u32, c: u32, seed: ptr<function, u32>) -> u32 {
     let result = (a * (*seed) + c) % modulus;
@@ -163,8 +163,7 @@ fn hitSpheres(spheres: ptr<storage, array<Sphere>>, ray: Ray, record: ptr<functi
     var closestSoFar = rayTmax;
 
     for (var i: u32 = 0; i < arrayLength(spheres); i++) {
-        let sphere = spheres[i];
-        if (hit(sphere, ray, tempRecord, rayTmin, closestSoFar)) {
+        if (hit(spheres[i], ray, tempRecord, rayTmin, closestSoFar)) {
             hitAnything = true;
             closestSoFar = tempRecord.t;
             *record = *tempRecord;
@@ -311,13 +310,14 @@ fn vertexMain(@location(0) pos: vec2f) -> @builtin(position) vec4f {
 @fragment
 fn fragmentMain(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     var seed = rng * u32(dot(pos,pos)) / u32(pos.x);
-    let ray = getRay(pos.xy, &seed);
     var pixelColor = vec3f(0,0,0);
+
     for (var sample = 0u; sample < SAMPLES_PER_PIXEL; sample++){
+        let ray = getRay(pos.xy, &seed);
         pixelColor += rayColor(&spheres, ray, &seed);
     }
 
     pixelColor /= SAMPLES_PER_PIXEL;
 
-    return vec4f(pixelColor, 1.0);
+    return vec4f(sqrt(pixelColor), 1.0);
 }

@@ -22,7 +22,6 @@ export default {
     },
 
     devServer: {
-        static: path.resolve(process.cwd(), 'dist'),
         compress: true,
         hot: true,
     },
@@ -31,11 +30,12 @@ export default {
         new webpack.HotModuleReplacementPlugin(),
         new HtmlWebpackPlugin({
             template: './index.html',
+            inject: false,
         }),
     ],
 
     cache: {
-        type: 'filesystem',
+        type: 'memory',
     },
 
     output: {
