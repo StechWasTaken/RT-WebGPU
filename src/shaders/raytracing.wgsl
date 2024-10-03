@@ -218,7 +218,7 @@ fn rayColor(spheres: ptr<storage, array<Sphere>>, ray: Ray, seed: ptr<function, 
                 return vec3f(0,0,0);
             }
         } else {
-            let unitDirection = normalize(previousRay.direction);
+            let unitDirection = normalize(currentRay.direction);
             let a = 0.5 * (unitDirection.y + 1.0);
             color *= (1.0 - a) * vec3f(1.0, 1.0, 1.0) + a * vec3f(0.5, 0.7, 1.0); 
             break;
