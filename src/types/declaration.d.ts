@@ -12,8 +12,9 @@ interface Sphere {
 interface Material {
     albedo: Vector3,
     fuzz: number,
+    refractionIndex: number,
     materialIndex: number,
-    padding: Vector3,
+    padding: Vector2,
 }
 
 interface Vector4 {

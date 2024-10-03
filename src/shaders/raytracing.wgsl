@@ -1,7 +1,8 @@
 struct Material {                               //              align(16)   size(32)
     albedo: vec3f,                              // offset(0)    align(16)   size(12)
     fuzz: f32,                                  // offset(12)   align(4)    size(4)
-    @size(16) materialIndex: f32,               // offset(16)   align(16)   size(16)
+    refractionIndex: f32,                       // offset(16)   align(4)    size(4)
+    @size(12) materialIndex: f32,               // offset(20)   align(12)   size(12)
 }
 
 struct Sphere {                                 //              align(16)   size(48)
@@ -153,6 +154,31 @@ fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: HitRecord, attenu
         *scattered = Ray(record.p, reflected);
         *attenuation = record.material.albedo;
     }
+    else if (record.material.materialIndex == 3) { // dielectric
+        *attenuation = vec3f(1.0, 1.0, 1.0);
+        var ri: f32;
+        if (record.frontFace) {
+            ri = 1.0 / record.material.refractionIndex;
+        } else {
+            ri = record.material.refractionIndex;
+        }
+
+        let unitDirection = normalize(incomingRay.direction);
+
+        let cosTheta = min(dot(-unitDirection, record.normal), 1.0);
+        let sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+
+        let cannotRefract = ri * sinTheta > 1.0;
+        var direction: vec3f;
+
+        if (cannotRefract || reflectance(cosTheta, ri) > random(seed)) {
+            direction = reflect(unitDirection, record.normal);
+        } else {
+            direction = refract(unitDirection, record.normal, ri);
+        }
+
+        *scattered = Ray(record.p, direction); 
+    }
 
     return true;
 }
@@ -164,6 +190,19 @@ fn nearZero(e: vec3f) -> bool {
 
 fn reflect(v: vec3f, n: vec3f) -> vec3f {
     return v - 2 * dot(v, n) * n;
+}
+
+fn reflectance(cosine: f32, refractionIndex: f32) -> f32 {
+    var r0 = (1.0 - refractionIndex) / (1 + refractionIndex);
+    r0 *= r0;
+    return r0 + (1 - r0) * pow((1 - cosine), 5);
+}
+
+fn refract(uv: vec3f, n: vec3f, etaIoverEtaT: f32) -> vec3f {
+    let cosTheta = min(dot(-uv, n), 1.0);
+    let rOutPerp = etaIoverEtaT * (uv + cosTheta * n);
+    let rOutParallel = -sqrt(abs(1.0 - dot(rOutPerp, rOutPerp))) * n;
+    return rOutPerp + rOutParallel;
 }
 
 fn hit(sphere: Sphere, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32, rayTmax: f32) -> bool {
@@ -189,7 +228,8 @@ fn hit(sphere: Sphere, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32,
 
     record.t = root;
     record.p = at(ray, record.t);
-    record.normal = (record.p - sphere.center) / sphere.r;
+    let outwardNormal = (record.p - sphere.center) / sphere.r;
+    setFaceNormal(record, ray, outwardNormal);
     record.material = sphere.material;
 
     return true;

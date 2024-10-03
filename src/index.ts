@@ -73,10 +73,9 @@ const randomUniformBuffer = device.createBuffer({
 
 const spheres = new Array<Sphere>();
 
-const padding12b: Vector3 = {
+const padding8b: Vector2 = {
     x: 0,
     y: 0,
-    z: 0,
 }
 
 const materialCenter: Material = {
@@ -86,8 +85,9 @@ const materialCenter: Material = {
         z: 0.5,
     },
     fuzz: 0,
+    refractionIndex: 1.0,
     materialIndex: 1,
-    padding: padding12b,
+    padding: padding8b,
 }
 
 const materialGround: Material = {
@@ -97,8 +97,9 @@ const materialGround: Material = {
         z: 0.0,
     },
     fuzz: 0,
+    refractionIndex: 1.0,
     materialIndex: 1,
-    padding: padding12b,
+    padding: padding8b,
 }
 
 const materialLeft: Material = {
@@ -108,8 +109,21 @@ const materialLeft: Material = {
         z: 0.8,
     },
     fuzz: 0.3,
-    materialIndex: 2,
-    padding: padding12b,
+    refractionIndex: 1.5,
+    materialIndex: 3,
+    padding: padding8b,
+}
+
+const materialBubble: Material = {
+    albedo: {
+        x: 0.8,
+        y: 0.8,
+        z: 0.8,
+    },
+    fuzz: 0.3,
+    refractionIndex: 1.0 / 1.5,
+    materialIndex: 3,
+    padding: padding8b,
 }
 
 const materialRight: Material = {
@@ -119,8 +133,9 @@ const materialRight: Material = {
         z: 0.2,
     },
     fuzz: 1.0,
+    refractionIndex: 1.0,
     materialIndex: 2,
-    padding: padding12b,
+    padding: padding8b,
 }
 
 spheres.push({
@@ -151,6 +166,16 @@ spheres.push({
     },
     r: 0.5,
     material: materialRight,
+});
+
+spheres.push({
+    center: {
+        x: -1.0,
+        y: 0,
+        z: -1.0,
+    },
+    r: 0.4,
+    material: materialBubble,
 });
 
 spheres.push({
