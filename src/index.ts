@@ -15,9 +15,6 @@ if (!adapter) {
 
 const canvas = document.querySelector("canvas");
 
-const canvasWidth = canvas.width;
-const canvasHeight = canvas.height;
-
 const device = await adapter.requestDevice();
 const context = canvas.getContext("webgpu");
 const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
@@ -53,17 +50,8 @@ const bindGroupLayout = device.createBindGroupLayout({
     ],
 });
 
-const canvasDimensions = new Float32Array([canvasWidth, canvasHeight]);
 const seed = Date.now();
 const randomValues = new Float32Array([seed]);
-
-console.log(randomValues);
-
-const canvasUniformBuffer = device.createBuffer({
-    label: "canvas dimensions",
-    size: canvasDimensions.byteLength,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
 
 const randomUniformBuffer = device.createBuffer({
     label: "RNG",
@@ -76,6 +64,30 @@ const spheres = new Array<Sphere>();
 const padding8b: Vector2 = {
     x: 0,
     y: 0,
+}
+
+const camera: Camera = {
+    lookFrom: {
+        x:  0,
+        y:  0,
+        z: -2,
+    },
+    fvov: 90,
+    lookAt: {
+        x:  0,
+        y:  0,
+        z: -1,
+    },
+    defocusAngle: 0.01,
+    vup: {
+        x:  0,
+        y:  1,
+        z:  0,
+    },
+    focusDistance: 10,
+    imageWidth: canvas.width,
+    padding: padding8b,
+    imageHeight: canvas.height,
 }
 
 const materialCenter: Material = {
@@ -188,12 +200,21 @@ spheres.push({
     material: materialLeft,
 });
 
-const info = BufferFactory.prepareForBuffer(spheres);
-const bufferReadySpheres = new Float32Array(info.data);
+const spheresInfo = BufferFactory.prepareForBuffer(spheres);
+const bufferReadySpheres = new Float32Array(spheresInfo.data);
+
+const cameraInfo = BufferFactory.prepareForBuffer([camera]);
+const bufferReadyCamera = new Float32Array(cameraInfo.data);
+
+const cameraUniformBuffer = device.createBuffer({
+    label: "camera",
+    size: cameraInfo.offset,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+})
 
 const spheresStorageBuffer = device.createBuffer({
     label: "sphere instances",
-    size: info.offset,
+    size: spheresInfo.offset,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 
@@ -213,7 +234,7 @@ const vertexBufferLayout: GPUVertexBufferLayout = {
 };
 
 device.queue.writeBuffer(spheresStorageBuffer, 0, bufferReadySpheres);
-device.queue.writeBuffer(canvasUniformBuffer, 0, canvasDimensions);
+device.queue.writeBuffer(cameraUniformBuffer, 0, bufferReadyCamera);
 device.queue.writeBuffer(randomUniformBuffer, 0, randomValues);
 device.queue.writeBuffer(vertexBuffer, 0, square);
 
@@ -250,7 +271,7 @@ const bindGroup = device.createBindGroup({
         {
             binding: 0,
             resource: { 
-                buffer: canvasUniformBuffer,
+                buffer: cameraUniformBuffer,
             },
         },
         {

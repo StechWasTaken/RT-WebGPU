@@ -17,6 +17,18 @@ interface Material {
     padding: Vector2,
 }
 
+interface Camera  {
+    lookFrom: Vector3,
+    fvov: number,
+    lookAt: Vector3,
+    defocusAngle: number,
+    vup: Vector3,
+    focusDistance: number,
+    imageWidth: number,
+    padding: Vector2,
+    imageHeight: number,
+}
+
 interface Vector4 {
     x: number,
     y: number,

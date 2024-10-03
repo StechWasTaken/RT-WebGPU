@@ -24,19 +24,23 @@ struct HitRecord {                              //              align(16)   size
     material: Material                          // offset(32)   align(16)   size(32)
 }
 
-@group(0) @binding(0) var<uniform> canvas: vec2f;
+struct Camera {                                 //              align(16)   size(80)
+    lookFrom: vec3f,                            // offset(0)    align(16)   size(12)
+    fvov: f32,                                  // offset(12)   align(4)    size(4)
+    lookAt: vec3f,                              // offset(16)   align(16)   size(12)
+    defocusAngle: f32,                          // offset(28)   align(4)    size(4)
+    vup: vec3f,                                 // offset(32)   align(16)   size(12)
+    focusDistance: f32,                         // offset(44)   align(4)    size(4)
+    @size(12) imageWidth: f32,                  // offset(60)   align(16)   size(12)
+    imageHeight: f32,                           // offset(64)   align(4)    size(4)
+}
+
+@group(0) @binding(0) var<uniform> camera: Camera;
 @group(0) @binding(1) var<storage, read> spheres: array<Sphere>;
 @group(0) @binding(2) var<uniform> rng: u32;
 
-const CAMERA_CENTER = vec3f(0, 0, 0);
 const MAX_BOUNCES = 50;
-const SAMPLES_PER_PIXEL = 500;
-const FIELD_OF_VIEW = 90;
-const LOOK_FROM = vec3f(-2,2,1);
-const LOOK_AT = vec3f(0,0,-1);
-const V_UP = vec3f(0,1,0);
-const DEFOCUS_ANGLE = 0.6;
-const FOCUS_DISTANCE = 10;
+const SAMPLES_PER_PIXEL = 50;
 
 fn lcg(modulus: u32, a: u32, c: u32, seed: ptr<function, u32>) -> u32 {
     let result = (a * (*seed) + c) % modulus;
@@ -103,38 +107,34 @@ fn setFaceNormal(record: ptr<function, HitRecord>, ray: Ray, outwardNormal: vec3
 }
 
 fn getRay(pos: vec2f, seed: ptr<function, u32>) -> Ray {
-    let canvasHeight = canvas.y;
-    let canvasWidth = canvas.x;
-    let ratio = canvasHeight / canvasWidth;
+    let center = camera.lookFrom;
 
-    let center = LOOK_FROM;
-
-    let theta = radians(FIELD_OF_VIEW);
+    let theta = radians(camera.fvov);
     let h = tan(theta / 2);
-    let viewportHeight = 2 * h * FOCUS_DISTANCE;
-    let viewportWidth = viewportHeight * (f32(canvasWidth) / canvasHeight);
+    let viewportHeight = 2 * h * camera.focusDistance;
+    let viewportWidth = viewportHeight * (f32(camera.imageWidth) / camera.imageHeight);
 
-    let w = normalize(LOOK_FROM - LOOK_AT);
-    let u = normalize(cross(V_UP, w));
+    let w = normalize(camera.lookFrom - camera.lookAt);
+    let u = normalize(cross(camera.vup, w));
     let v = cross(w, u);
     
     let viewportU = viewportWidth * u;
     let viewportV = viewportHeight * -v;
 
-    let pixelDeltaU = viewportU / canvasWidth;
-    let pixelDeltaV = viewportV / canvasHeight;
+    let pixelDeltaU = viewportU / camera.imageWidth;
+    let pixelDeltaV = viewportV / camera.imageHeight;
 
-    let viewportUpperLeft = center - (FOCUS_DISTANCE * w) - viewportU / 2 - viewportV / 2;
+    let viewportUpperLeft = center - (camera.focusDistance * w) - viewportU / 2 - viewportV / 2;
     let pixel00Location = viewportUpperLeft + 0.5 * (pixelDeltaU + pixelDeltaV);
 
-    let defocusRadius = FOCUS_DISTANCE * tan(radians(DEFOCUS_ANGLE / 2));
+    let defocusRadius = camera.focusDistance * tan(radians(camera.defocusAngle / 2));
     let defocusDiskU = u * defocusRadius;
     let defocusDiskV = v * defocusRadius;
 
     let offset = sampleSquare(seed);
     let pixelSample = pixel00Location + ((pos.x + offset.x) * pixelDeltaU) + ((pos.y + offset.y) * pixelDeltaV);
     var rayOrigin: vec3f;
-    if (DEFOCUS_ANGLE <= 0) {
+    if (camera.defocusAngle <= 0) {
         rayOrigin = center;
     } else {
         rayOrigin = defocusDiskSample(seed, center, defocusDiskU, defocusDiskV);
