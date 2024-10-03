@@ -205,9 +205,6 @@ fn rayColor(spheres: ptr<storage, array<Sphere>>, ray: Ray, seed: ptr<function, 
         var record = HitRecord();
 
         if (hitSpheres(spheres, currentRay, &record, 0.001, 1e16)) {
-            // let direction = record.normal + randomUnitVector(seed);
-            // previousRay = currentRay;
-            // currentRay = Ray(record.p, direction);
             var scattered: Ray;
             var attenuation: vec3f;
             if (scatter(seed, currentRay, record, &attenuation, &scattered)) {
@@ -223,10 +220,6 @@ fn rayColor(spheres: ptr<storage, array<Sphere>>, ray: Ray, seed: ptr<function, 
             color *= (1.0 - a) * vec3f(1.0, 1.0, 1.0) + a * vec3f(0.5, 0.7, 1.0); 
             break;
         }
-    }
-
-    if (i == MAX_BOUNCES) {
-        return vec3f(0,0,0);
     }
 
     return color;
