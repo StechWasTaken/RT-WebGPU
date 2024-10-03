@@ -7,7 +7,7 @@ struct Material {                               //              align(16)   size
 struct Sphere {                                 //              align(16)   size(48)
     center: vec3f,                              // offset(0)    align(16)   size(12)
     r: f32,                                     // offset(12)   align(4)    size(4)
-    material: Material,                         // offset(16)   align(16)   size(24)
+    material: Material,                         // offset(16)   align(16)   size(32)
 }
 
 struct Ray {                                    //              align(16)   size(32)
@@ -15,12 +15,12 @@ struct Ray {                                    //              align(16)   size
     @size(16) direction: vec3f,                 // offset(16)   align(16)   size(16)
 }
 
-struct HitRecord {                              //              align(16)   size(32)
+struct HitRecord {                              //              align(16)   size(64)
     p: vec3f,                                   // offset(0)    align(16)   size(12)
     t: f32,                                     // offset(12)   align(4)    size(4)
     normal: vec3f,                              // offset(16)   align(16)   size(12)
     @size(4) frontFace: bool,                   // offset(28)   align(4)    size(4)
-    material: Material                          // offset(32)   align(16)   size(16)
+    material: Material                          // offset(32)   align(16)   size(32)
 }
 
 @group(0) @binding(0) var<uniform> canvas: vec2f;
@@ -29,7 +29,7 @@ struct HitRecord {                              //              align(16)   size
 
 const CAMERA_CENTER = vec3f(0, 0, 0);
 const MAX_BOUNCES = 50;
-const SAMPLES_PER_PIXEL = 500;
+const SAMPLES_PER_PIXEL = 100;
 
 fn lcg(modulus: u32, a: u32, c: u32, seed: ptr<function, u32>) -> u32 {
     let result = (a * (*seed) + c) % modulus;
