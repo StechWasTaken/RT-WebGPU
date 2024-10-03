@@ -6,6 +6,14 @@ declare module '*.wgsl' {
 interface Sphere {
     center: Vector3,
     r: number,
+    material: Material,
+}
+
+interface Material {
+    albedo: Vector3,
+    fuzz: number,
+    materialIndex: number,
+    padding: Vector3,
 }
 
 interface Vector4 {

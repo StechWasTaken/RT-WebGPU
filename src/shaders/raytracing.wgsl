@@ -1,18 +1,26 @@
-struct Sphere {
-    center: vec3f,
-    r: f32,
+struct Material {                               //              align(16)   size(32)
+    albedo: vec3f,                              // offset(0)    align(16)   size(12)
+    fuzz: f32,                                  // offset(12)   align(4)    size(4)
+    @size(16) materialIndex: f32,               // offset(16)   align(16)   size(16)
 }
 
-struct Ray {
-    origin: vec3f,
-    direction: vec3f,
+struct Sphere {                                 //              align(16)   size(48)
+    center: vec3f,                              // offset(0)    align(16)   size(12)
+    r: f32,                                     // offset(12)   align(4)    size(4)
+    material: Material,                         // offset(16)   align(16)   size(24)
 }
 
-struct HitRecord {
-    p: vec3f,
-    normal: vec3f,
-    t: f32,
-    frontFace: bool,
+struct Ray {                                    //              align(16)   size(32)
+    @size(16) origin: vec3f,                    // offset(0)    align(16)   size(16)
+    @size(16) direction: vec3f,                 // offset(16)   align(16)   size(16)
+}
+
+struct HitRecord {                              //              align(16)   size(32)
+    p: vec3f,                                   // offset(0)    align(16)   size(12)
+    t: f32,                                     // offset(12)   align(4)    size(4)
+    normal: vec3f,                              // offset(16)   align(16)   size(12)
+    @size(4) frontFace: bool,                   // offset(28)   align(4)    size(4)
+    material: Material                          // offset(32)   align(16)   size(16)
 }
 
 @group(0) @binding(0) var<uniform> canvas: vec2f;
@@ -21,7 +29,7 @@ struct HitRecord {
 
 const CAMERA_CENTER = vec3f(0, 0, 0);
 const MAX_BOUNCES = 50;
-const SAMPLES_PER_PIXEL = 50;
+const SAMPLES_PER_PIXEL = 500;
 
 fn lcg(modulus: u32, a: u32, c: u32, seed: ptr<function, u32>) -> u32 {
     let result = (a * (*seed) + c) % modulus;
@@ -127,6 +135,37 @@ fn hitSpheres(spheres: ptr<storage, array<Sphere>>, ray: Ray, record: ptr<functi
     return hitAnything;
 }
 
+fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: HitRecord, attenuation: ptr<function, vec3f>, scattered: ptr<function, Ray>) -> bool {
+    
+    if (record.material.materialIndex == 1) { // lambertian
+        var scatterDirection = record.normal + randomUnitVector(seed);
+
+        if (nearZero(scatterDirection)) {
+            scatterDirection = record.normal;
+        }
+
+        *scattered = Ray(record.p, scatterDirection);
+        *attenuation = record.material.albedo;
+    }
+    else if (record.material.materialIndex == 2) { // metal
+        var reflected = reflect(incomingRay.direction, record.normal);
+        reflected = normalize(reflected) + (record.material.fuzz * randomUnitVector(seed));
+        *scattered = Ray(record.p, reflected);
+        *attenuation = record.material.albedo;
+    }
+
+    return true;
+}
+
+fn nearZero(e: vec3f) -> bool {
+    let s = 1e-8;
+    return (abs(e.x) < s) && (abs(e.y) < s) && (abs(e.z) < s);
+}
+
+fn reflect(v: vec3f, n: vec3f) -> vec3f {
+    return v - 2 * dot(v, n) * n;
+}
+
 fn hit(sphere: Sphere, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32, rayTmax: f32) -> bool {
     let oc = sphere.center - ray.origin;
     let a = dot(ray.direction, ray.direction);
@@ -151,6 +190,7 @@ fn hit(sphere: Sphere, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32,
     record.t = root;
     record.p = at(ray, record.t);
     record.normal = (record.p - sphere.center) / sphere.r;
+    record.material = sphere.material;
 
     return true;
 }
@@ -165,12 +205,20 @@ fn rayColor(spheres: ptr<storage, array<Sphere>>, ray: Ray, seed: ptr<function, 
         var record = HitRecord();
 
         if (hitSpheres(spheres, currentRay, &record, 0.001, 1e16)) {
-            let direction = record.normal + randomUnitVector(seed);
-            previousRay = currentRay;
-            currentRay = Ray(record.p, direction);
-            color *= 0.5;
+            // let direction = record.normal + randomUnitVector(seed);
+            // previousRay = currentRay;
+            // currentRay = Ray(record.p, direction);
+            var scattered: Ray;
+            var attenuation: vec3f;
+            if (scatter(seed, currentRay, record, &attenuation, &scattered)) {
+                previousRay = currentRay;
+                currentRay = scattered;
+                color *= attenuation;
+            } else {
+                return vec3f(0,0,0);
+            }
         } else {
-            let unitDirection = normalize(ray.direction);
+            let unitDirection = normalize(previousRay.direction);
             let a = 0.5 * (unitDirection.y + 1.0);
             color *= (1.0 - a) * vec3f(1.0, 1.0, 1.0) + a * vec3f(0.5, 0.7, 1.0); 
             break;

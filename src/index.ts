@@ -73,6 +73,56 @@ const randomUniformBuffer = device.createBuffer({
 
 const spheres = new Array<Sphere>();
 
+const padding12b: Vector3 = {
+    x: 0,
+    y: 0,
+    z: 0,
+}
+
+const materialCenter: Material = {
+    albedo: {
+        x: 0.1,
+        y: 0.2,
+        z: 0.5,
+    },
+    fuzz: 0,
+    materialIndex: 1,
+    padding: padding12b,
+}
+
+const materialGround: Material = {
+    albedo: {
+        x: 0.8,
+        y: 0.8,
+        z: 0.0,
+    },
+    fuzz: 0,
+    materialIndex: 1,
+    padding: padding12b,
+}
+
+const materialLeft: Material = {
+    albedo: {
+        x: 0.8,
+        y: 0.8,
+        z: 0.8,
+    },
+    fuzz: 0.3,
+    materialIndex: 2,
+    padding: padding12b,
+}
+
+const materialRight: Material = {
+    albedo: {
+        x: 0.8,
+        y: 0.6,
+        z: 0.2,
+    },
+    fuzz: 1.0,
+    materialIndex: 2,
+    padding: padding12b,
+}
+
 spheres.push({
     center: {
         x: 0,
@@ -80,6 +130,7 @@ spheres.push({
         z: -1.2,
     },
     r: 0.5,
+    material: materialCenter,
 });
 
 spheres.push({
@@ -89,6 +140,7 @@ spheres.push({
         z: -1,
     },
     r: 100,
+    material: materialGround,
 });
 
 spheres.push({
@@ -98,6 +150,7 @@ spheres.push({
         z: -1,
     },
     r: 0.5,
+    material: materialRight,
 });
 
 spheres.push({
@@ -107,6 +160,7 @@ spheres.push({
         z: -1,
     },
     r: 0.5,
+    material: materialLeft,
 });
 
 const info = BufferFactory.prepareForBuffer(spheres);
