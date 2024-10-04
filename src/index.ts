@@ -104,14 +104,14 @@ const camera: Camera = {
 }
 
 const params: ShaderParameters = {
-    maxBounces: 5,
-    samplesPerPixel: 5,
+    maxBounces: 1,
+    samplesPerPixel: 3,
 }
 
 const groundMaterial = MaterialFactory.createLambertian({x: 0.5, y: 0.5, z: 0.5});
 spheres.push(SphereFactory.createSphere(0,-1000,0,1000,groundMaterial));
 
-const range = 2;
+const range = 5;
 
 for (let a = -range; a < range; a++) {
     for (let b = -range; b < range; b++) {
@@ -264,26 +264,26 @@ const bindGroup = device.createBindGroup({
 });
 
 let lastTime = performance.now();
-const fpsHistory: Array<number> = [];
-const maxSamples = 30;
+let frameCount = 0;
+let fps = 0;
+let fpsUpdateTime = 0;
 const fpsCounter = document.querySelector(".fps-counter");
 
-function render() {
-    const time = performance.now();
+function render(time: number) {
     const deltaTime = time - lastTime;
     lastTime = time;
 
-    const fps = 1000 / deltaTime;
+    frameCount++;
 
-    fpsHistory.push(fps);
+    fpsUpdateTime += deltaTime;
 
-    if (fpsHistory.length > maxSamples) {
-        fpsHistory.shift();
+    if (fpsUpdateTime >= 1000) {
+        fps = frameCount;
+        frameCount = 0;
+        fpsUpdateTime = 0;
     }
 
-    const averageFPS = fpsHistory.reduce((sum, current) => sum + current, 0) / fpsHistory.length;
-
-    fpsCounter.textContent = `FPS: ${averageFPS.toFixed(2)}`;
+    fpsCounter.textContent = `FPS: ${fps.toFixed(2)}`;
     
     CameraHelper.rotateCamera(camera, deltaTime, Math.PI / 5000);
 
