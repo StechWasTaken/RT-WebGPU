@@ -105,7 +105,7 @@ const camera: Camera = {
 
 const params: ShaderParameters = {
     maxBounces: 5,
-    samplesPerPixel: 20,
+    samplesPerPixel: 5,
 }
 
 const groundMaterial = MaterialFactory.createLambertian({x: 0.5, y: 0.5, z: 0.5});
@@ -163,10 +163,8 @@ const bufferReadySpheres = new Float32Array(spheresInfo.data);
 
 const cameraData = CameraFactory.createCameraData(camera);
 const cameraDataInfo = BufferFactory.prepareForBuffer([cameraData]);
-const bufferReadyCameraData = new Float32Array(cameraDataInfo.data);
 
 const shaderParamsInfo = BufferFactory.prepareForBuffer([params]);
-const bufferReadyShaderParams = new Float32Array(shaderParamsInfo.data);
 
 const paramsUniformBuffer = device.createBuffer({
     label: "shader params",
@@ -202,7 +200,6 @@ const vertexBufferLayout: GPUVertexBufferLayout = {
 };
 
 device.queue.writeBuffer(spheresStorageBuffer, 0, bufferReadySpheres);
-device.queue.writeBuffer(paramsUniformBuffer, 0, bufferReadyShaderParams);
 device.queue.writeBuffer(randomUniformBuffer, 0, randomValues);
 device.queue.writeBuffer(vertexBuffer, 0, square);
 
@@ -265,7 +262,7 @@ const bindGroup = device.createBindGroup({
 
 let lastTime = performance.now();
 let frameCount = 0;
-let fps = 0;
+let fps = 60;
 let fpsUpdateTime = 0;
 const fpsCounter = document.querySelector(".fps-counter");
 
@@ -282,8 +279,14 @@ function render(time: number) {
         frameCount = 0;
         fpsUpdateTime = 0;
         fpsCounter.textContent = `FPS: ${fps.toFixed(2)}`;
+        if (fps < 60 && params.samplesPerPixel != 1) {
+            params.samplesPerPixel -= Math.floor((60 - fps) / 10);
+        }
+    
+        if (fps > 60) {
+            params.samplesPerPixel += Math.floor((fps - 60) / 10);
+        }
     }
-
     
     CameraHelper.rotateCamera(camera, deltaTime, Math.PI / 5000);
 
@@ -291,7 +294,11 @@ function render(time: number) {
     const cameraDataInfo = BufferFactory.prepareForBuffer([cameraData]);
     const bufferReadyCameraData = new Float32Array(cameraDataInfo.data);
 
+    const shaderParamsInfo = BufferFactory.prepareForBuffer([params]);
+    const bufferReadyShaderParams = new Float32Array(shaderParamsInfo.data);
+
     device.queue.writeBuffer(cameraDataUniformBuffer, 0, bufferReadyCameraData);
+    device.queue.writeBuffer(paramsUniformBuffer, 0, bufferReadyShaderParams);
 
     const encoder = device.createCommandEncoder();
 
