@@ -104,14 +104,14 @@ const camera: Camera = {
 }
 
 const params: ShaderParameters = {
-    maxBounces: 1,
-    samplesPerPixel: 3,
+    maxBounces: 10,
+    samplesPerPixel: 4,
 }
 
 const groundMaterial = MaterialFactory.createLambertian({x: 0.5, y: 0.5, z: 0.5});
 spheres.push(SphereFactory.createSphere(0,-1000,0,1000,groundMaterial));
 
-const range = 5;
+const range = 2;
 
 for (let a = -range; a < range; a++) {
     for (let b = -range; b < range; b++) {
@@ -281,9 +281,9 @@ function render(time: number) {
         fps = frameCount;
         frameCount = 0;
         fpsUpdateTime = 0;
+        fpsCounter.textContent = `FPS: ${fps.toFixed(2)}`;
     }
 
-    fpsCounter.textContent = `FPS: ${fps.toFixed(2)}`;
     
     CameraHelper.rotateCamera(camera, deltaTime, Math.PI / 5000);
 
