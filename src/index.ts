@@ -105,7 +105,7 @@ const camera: Camera = {
 
 const params: ShaderParameters = {
     maxBounces: 5,
-    samplesPerPixel: 5,
+    samplesPerPixel: 1,
 }
 
 const groundMaterial = MaterialFactory.createLambertian({x: 0.5, y: 0.5, z: 0.5});
@@ -280,11 +280,11 @@ function render(time: number) {
         fpsUpdateTime = 0;
         fpsCounter.textContent = `FPS: ${fps.toFixed(2)}`;
         if (fps < 60 && params.samplesPerPixel != 1) {
-            params.samplesPerPixel -= Math.floor((60 - fps) / 10);
+            params.samplesPerPixel -= Math.floor((60 - fps) / 10 + 0.5);
         }
     
         if (fps > 60) {
-            params.samplesPerPixel += Math.floor((fps - 60) / 10);
+            params.samplesPerPixel += Math.floor((fps - 60) / 10 + 0.5);
         }
     }
     

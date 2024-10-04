@@ -4,7 +4,7 @@ This project explores the power of WebGPU for real-time rendering, focusing on r
 
 ### Project Overview
 
-This project adapts the concepts from *Ray Tracing in One Weekend* by Peter Shirley to run in WebGPU. It aims to demonstrate ray tracing techniques, such as lighting, reflections, and shadows, using WebGPU's modern pipeline.
+This project adapts the concepts from *Ray Tracing in One Weekend* to run in WebGPU. It aims to demonstrate ray tracing techniques, such as lighting, reflections, and shadows, using WebGPU's modern pipeline.
 
 ### Key Features
 
