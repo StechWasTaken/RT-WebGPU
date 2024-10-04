@@ -42,15 +42,22 @@ const bindGroupLayout = device.createBindGroupLayout({
             visibility: GPUShaderStage.FRAGMENT,
             buffer: {
                 type: "read-only-storage",
-            }
+            },
         },
         {
             binding: 2,
             visibility: GPUShaderStage.FRAGMENT,
             buffer: {
                 type: "uniform",
-            }
-        }
+            },
+        },
+        {
+            binding: 3,
+            visibility: GPUShaderStage.FRAGMENT,
+            buffer: {
+                type: "uniform",
+            },
+        },
     ],
 });
 
@@ -82,7 +89,7 @@ const camera: Camera = {
         y:  0,
         z:  0,
     },
-    defocusAngle: 0.6,
+    defocusAngle: 0,
     vup: {
         x:  0,
         y:  1,
@@ -92,6 +99,11 @@ const camera: Camera = {
     imageWidth: canvas.width,
     padding: padding8b,
     imageHeight: canvas.height,
+}
+
+const params: ShaderParameters = {
+    maxBounces: 10,
+    samplesPerPixel: 10,
 }
 
 const groundMaterial = MaterialFactory.createLambertian({x: 0.5, y: 0.5, z: 0.5});
@@ -144,13 +156,20 @@ spheres.push(SphereFactory.createSphere(-4,1,0,1,material2));
 const material3 = MaterialFactory.createMetal({x: 0.7, y: 0.6, z: 0.5}, 0.0);
 spheres.push(SphereFactory.createSphere(4,1,0,1,material3));
 
-console.log(spheres.length);
-
 const spheresInfo = BufferFactory.prepareForBuffer(spheres);
 const bufferReadySpheres = new Float32Array(spheresInfo.data);
 
 const cameraInfo = BufferFactory.prepareForBuffer([camera]);
 const bufferReadyCamera = new Float32Array(cameraInfo.data);
+
+const shaderParamsInfo = BufferFactory.prepareForBuffer([params]);
+const bufferReadyShaderParams = new Float32Array(shaderParamsInfo.data);
+
+const paramsUniformBuffer = device.createBuffer({
+    label: "shader params",
+    size: shaderParamsInfo.offset,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+})
 
 const cameraUniformBuffer = device.createBuffer({
     label: "camera",
@@ -181,6 +200,7 @@ const vertexBufferLayout: GPUVertexBufferLayout = {
 
 device.queue.writeBuffer(spheresStorageBuffer, 0, bufferReadySpheres);
 device.queue.writeBuffer(cameraUniformBuffer, 0, bufferReadyCamera);
+device.queue.writeBuffer(paramsUniformBuffer, 0, bufferReadyShaderParams);
 device.queue.writeBuffer(randomUniformBuffer, 0, randomValues);
 device.queue.writeBuffer(vertexBuffer, 0, square);
 
@@ -230,6 +250,12 @@ const bindGroup = device.createBindGroup({
             binding: 2,
             resource: {
                 buffer: randomUniformBuffer,
+            }
+        },
+        {
+            binding: 3,
+            resource: {
+                buffer: paramsUniformBuffer,
             }
         }
     ],

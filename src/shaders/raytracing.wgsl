@@ -35,12 +35,15 @@ struct Camera {                                 //              align(16)   size
     imageHeight: f32,                           // offset(64)   align(4)    size(4)
 }
 
+struct Parameters {                             //              align(4)    size(8)
+    maxBounces: f32,                            //  offset(0)   align(4)    size(4)
+    samplesPerPixel: f32,                       //  offset(4)   align(4)    size(4)
+}
+
 @group(0) @binding(0) var<uniform> camera: Camera;
 @group(0) @binding(1) var<storage, read> spheres: array<Sphere>;
 @group(0) @binding(2) var<uniform> rng: u32;
-
-const MAX_BOUNCES = 30;
-const SAMPLES_PER_PIXEL = 30;
+@group(0) @binding(3) var<uniform> params: Parameters;
 
 fn lcg(modulus: u32, a: u32, c: u32, seed: ptr<function, u32>) -> u32 {
     let result = (a * (*seed) + c) % modulus;
@@ -106,30 +109,16 @@ fn setFaceNormal(record: ptr<function, HitRecord>, ray: Ray, outwardNormal: vec3
     }
 }
 
-fn getRay(pos: vec2f, seed: ptr<function, u32>) -> Ray {
+fn getRay(
+    pos: vec2f, 
+    seed: ptr<function, u32>, 
+    pixel00Location: vec3f, 
+    pixelDeltaU: vec3f, 
+    pixelDeltaV: vec3f, 
+    defocusDiskU: vec3f, 
+    defocusDiskV: vec3f
+) -> Ray {
     let center = camera.lookFrom;
-
-    let theta = radians(camera.fvov);
-    let h = tan(theta / 2);
-    let viewportHeight = 2 * h * camera.focusDistance;
-    let viewportWidth = viewportHeight * (f32(camera.imageWidth) / camera.imageHeight);
-
-    let w = normalize(camera.lookFrom - camera.lookAt);
-    let u = normalize(cross(camera.vup, w));
-    let v = cross(w, u);
-    
-    let viewportU = viewportWidth * u;
-    let viewportV = viewportHeight * -v;
-
-    let pixelDeltaU = viewportU / camera.imageWidth;
-    let pixelDeltaV = viewportV / camera.imageHeight;
-
-    let viewportUpperLeft = center - (camera.focusDistance * w) - viewportU / 2 - viewportV / 2;
-    let pixel00Location = viewportUpperLeft + 0.5 * (pixelDeltaU + pixelDeltaV);
-
-    let defocusRadius = camera.focusDistance * tan(radians(camera.defocusAngle / 2));
-    let defocusDiskU = u * defocusRadius;
-    let defocusDiskV = v * defocusRadius;
 
     let offset = sampleSquare(seed);
     let pixelSample = pixel00Location + ((pos.x + offset.x) * pixelDeltaU) + ((pos.y + offset.y) * pixelDeltaV);
@@ -278,7 +267,7 @@ fn rayColor(spheres: ptr<storage, array<Sphere>>, ray: Ray, seed: ptr<function, 
     var currentRay = ray;
 
     var i: u32;
-    for (i = 0; i < MAX_BOUNCES; i++) {
+    for (i = 0; i < u32(params.maxBounces); i++) {
         var record = HitRecord();
 
         if (hitSpheres(spheres, currentRay, &record, 0.001, 1e16)) {
@@ -312,12 +301,34 @@ fn fragmentMain(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     var seed = rng * u32(dot(pos,pos)) / u32(pos.x);
     var pixelColor = vec3f(0,0,0);
 
-    for (var sample = 0u; sample < SAMPLES_PER_PIXEL; sample++){
-        let ray = getRay(pos.xy, &seed);
+    let theta = radians(camera.fvov);
+    let h = tan(theta / 2);
+    let viewportHeight = 2 * h * camera.focusDistance;
+    let viewportWidth = viewportHeight * camera.imageWidth / camera.imageHeight;
+
+    let w = normalize(camera.lookFrom - camera.lookAt);
+    let u = normalize(cross(camera.vup, w));
+    let v = cross(w, u);
+    
+    let viewportU = viewportWidth * u;
+    let viewportV = viewportHeight * -v;
+
+    let pixelDeltaU = viewportU / camera.imageWidth;
+    let pixelDeltaV = viewportV / camera.imageHeight;
+
+    let viewportUpperLeft = camera.lookFrom - (camera.focusDistance * w) - viewportU / 2 - viewportV / 2;
+    let pixel00Location = viewportUpperLeft + 0.5 * (pixelDeltaU + pixelDeltaV);
+
+    let defocusRadius = camera.focusDistance * tan(radians(camera.defocusAngle / 2));
+    let defocusDiskU = u * defocusRadius;
+    let defocusDiskV = v * defocusRadius;
+
+    for (var sample = 0u; sample < u32(params.samplesPerPixel); sample++) {
+        let ray = getRay(pos.xy, &seed, pixel00Location, pixelDeltaU, pixelDeltaV, defocusDiskU, defocusDiskV);
         pixelColor += rayColor(&spheres, ray, &seed);
     }
 
-    pixelColor /= SAMPLES_PER_PIXEL;
+    pixelColor /= params.samplesPerPixel;
 
     return vec4f(sqrt(pixelColor), 1.0);
 }

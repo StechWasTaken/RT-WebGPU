@@ -29,6 +29,11 @@ interface Camera  {
     imageHeight: number,
 }
 
+interface ShaderParameters {
+    maxBounces: number,
+    samplesPerPixel: number,
+}
+
 interface Vector4 {
     x: number,
     y: number,
