@@ -35,12 +35,22 @@ struct Camera {                                 //              align(16)   size
     imageHeight: f32,                           // offset(64)   align(4)    size(4)
 }
 
+struct CameraData {
+    @size(16) lookFrom: vec3f,                  // offset(0)    align(16)   size(96)
+    @size(16) pixel00Location: vec3f,           // offset(16)   align(16)   size(16)     
+    @size(16) pixelDeltaU: vec3f,               // offset(32)   align(16)   size(16)                     
+    @size(16) pixelDeltaV: vec3f,               // offset(48)   align(16)   size(16)     
+    @size(16) defocusDiskU: vec3f,              // offset(64)   align(16)   size(16)     
+    defocusDiskV: vec3f,                        // offset(80)   align(16)   size(12)
+    defocusAngle: f32,                          // offset(92)   align(4)    size(4)    
+}
+
 struct Parameters {                             //              align(4)    size(8)
     maxBounces: f32,                            //  offset(0)   align(4)    size(4)
     samplesPerPixel: f32,                       //  offset(4)   align(4)    size(4)
 }
 
-@group(0) @binding(0) var<uniform> camera: Camera;
+@group(0) @binding(0) var<uniform> cameraData: CameraData;
 @group(0) @binding(1) var<storage, read> spheres: array<Sphere>;
 @group(0) @binding(2) var<uniform> rng: u32;
 @group(0) @binding(3) var<uniform> params: Parameters;
@@ -66,27 +76,24 @@ fn randomRange(seed: ptr<function, u32>, min: f32, max: f32) -> f32 {
 }
 
 fn randomUnitVector(seed: ptr<function, u32>) -> vec3f {
-    var q: vec3f; 
-    var lensq: f32;
-    while (true) {
-        q = vec3f(randomRange(seed, -1, 1), randomRange(seed, -1, 1), randomRange(seed, -1, 1));
-        lensq = dot(q, q);
-        if (1.175e-38 < lensq && lensq <= 1) {
-            break;
-        }
-    }
-    return q / sqrt(lensq);
+    let theta = 2 * 3.14159 * random(seed);
+    let phi = acos(2 * random(seed) - 1);
+
+    let x = sin(phi) * cos(theta);
+    let y = sin(phi) * sin(theta);
+    let z = cos(phi);
+
+    return vec3f(x, y, z);
 }
 
 fn randomInUnitDisk(seed: ptr<function, u32>) -> vec3f {
-    var p: vec3f;
-    while (true) {
-        p = vec3f(randomRange(seed, -1, 1), randomRange(seed, -1, 1), 0);
-        if (dot(p, p) < 1) {
-            break;
-        }
-    }
-    return p;
+    let theta = 2 * 3.14159 * random(seed);
+    let r = sqrt(random(seed));
+
+    let x = r * cos(theta);
+    let y = r * sin(theta);
+
+    return vec3f(x, y, 0);
 }
 
 fn randomOnHemisphere(normal: vec3f, seed: ptr<function, u32>) -> vec3f {
@@ -109,37 +116,35 @@ fn setFaceNormal(record: ptr<function, HitRecord>, ray: Ray, outwardNormal: vec3
     }
 }
 
-fn getRay(
-    pos: vec2f, 
-    seed: ptr<function, u32>, 
-    pixel00Location: vec3f, 
-    pixelDeltaU: vec3f, 
-    pixelDeltaV: vec3f, 
-    defocusDiskU: vec3f, 
-    defocusDiskV: vec3f
-) -> Ray {
-    let center = camera.lookFrom;
+fn getRay(pos: vec2f, seed: ptr<function, u32>) -> Ray {
+    let center = cameraData.lookFrom;
 
-    let offset = sampleSquare(seed);
-    let pixelSample = pixel00Location + ((pos.x + offset.x) * pixelDeltaU) + ((pos.y + offset.y) * pixelDeltaV);
+    let pixelSample = cameraData.pixel00Location + pos.x * cameraData.pixelDeltaU + pos.y * cameraData.pixelDeltaV;
     var rayOrigin: vec3f;
-    if (camera.defocusAngle <= 0) {
+    if (cameraData.defocusAngle <= 0) {
         rayOrigin = center;
     } else {
-        rayOrigin = defocusDiskSample(seed, center, defocusDiskU, defocusDiskV);
+        rayOrigin = defocusDiskSample(seed, center);
     }
     let rayDirection = pixelSample - rayOrigin;
 
     return Ray(rayOrigin, rayDirection);
 }
 
-fn sampleSquare(seed: ptr<function, u32>) -> vec3f {
-    return vec3f(random(seed) - 0.5, random(seed) - 0.5, 0);
+fn sampleRandomSquare(seed: ptr<function, u32>) -> vec2f {
+    return vec2f(random(seed) - 0.5, random(seed) - 0.5);
 }
 
-fn defocusDiskSample(seed: ptr<function, u32>, center: vec3f, defocusDiskU: vec3f, defocusDiskV: vec3f) -> vec3f {
+fn sampleSquare(samples: f32, index: f32) -> vec2f {
+    let width = sqrt(samples);
+    let x = index % width;
+    let y = floor(index / width);
+    return vec2f((x + 0.5) / width, (y + 0.5) / width);
+}
+
+fn defocusDiskSample(seed: ptr<function, u32>, center: vec3f) -> vec3f {
     let p = randomInUnitDisk(seed);
-    return center + (p.x * defocusDiskU) + (p.y * defocusDiskV);
+    return center + (p.x * cameraData.defocusDiskU) + (p.y * cameraData.defocusDiskV);
 }
 
 fn at(ray: Ray, t: f32) -> vec3f {
@@ -219,7 +224,7 @@ fn reflect(v: vec3f, n: vec3f) -> vec3f {
 }
 
 fn reflectance(cosine: f32, refractionIndex: f32) -> f32 {
-    var r0 = (1.0 - refractionIndex) / (1 + refractionIndex);
+    var r0 = (1 - refractionIndex) / (1 + refractionIndex);
     r0 *= r0;
     return r0 + (1 - r0) * pow((1 - cosine), 5);
 }
@@ -263,7 +268,6 @@ fn hit(sphere: Sphere, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32,
 
 fn rayColor(spheres: ptr<storage, array<Sphere>>, ray: Ray, seed: ptr<function, u32>) -> vec3f {
     var color = vec3f(1.0, 1.0, 1.0);
-    var previousRay = ray;
     var currentRay = ray;
 
     var i: u32;
@@ -274,7 +278,6 @@ fn rayColor(spheres: ptr<storage, array<Sphere>>, ray: Ray, seed: ptr<function, 
             var scattered: Ray;
             var attenuation: vec3f;
             if (scatter(seed, currentRay, record, &attenuation, &scattered)) {
-                previousRay = currentRay;
                 currentRay = scattered;
                 color *= attenuation;
             } else {
@@ -301,34 +304,16 @@ fn fragmentMain(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     var seed = rng * u32(dot(pos,pos)) / u32(pos.x);
     var pixelColor = vec3f(0,0,0);
 
-    let theta = radians(camera.fvov);
-    let h = tan(theta / 2);
-    let viewportHeight = 2 * h * camera.focusDistance;
-    let viewportWidth = viewportHeight * camera.imageWidth / camera.imageHeight;
+    let samples = pow(params.samplesPerPixel, 2);
+    for (var sample = 0.0; sample < samples; sample += 1) {
+        let offset = sampleSquare(samples, sample);
+        let ray = getRay(pos.xy + offset, &seed);
+        let color = rayColor(&spheres, ray, &seed);
 
-    let w = normalize(camera.lookFrom - camera.lookAt);
-    let u = normalize(cross(camera.vup, w));
-    let v = cross(w, u);
-    
-    let viewportU = viewportWidth * u;
-    let viewportV = viewportHeight * -v;
-
-    let pixelDeltaU = viewportU / camera.imageWidth;
-    let pixelDeltaV = viewportV / camera.imageHeight;
-
-    let viewportUpperLeft = camera.lookFrom - (camera.focusDistance * w) - viewportU / 2 - viewportV / 2;
-    let pixel00Location = viewportUpperLeft + 0.5 * (pixelDeltaU + pixelDeltaV);
-
-    let defocusRadius = camera.focusDistance * tan(radians(camera.defocusAngle / 2));
-    let defocusDiskU = u * defocusRadius;
-    let defocusDiskV = v * defocusRadius;
-
-    for (var sample = 0u; sample < u32(params.samplesPerPixel); sample++) {
-        let ray = getRay(pos.xy, &seed, pixel00Location, pixelDeltaU, pixelDeltaV, defocusDiskU, defocusDiskV);
-        pixelColor += rayColor(&spheres, ray, &seed);
+        pixelColor += color;
     }
 
-    pixelColor /= params.samplesPerPixel;
+    pixelColor /= samples;
 
     return vec4f(sqrt(pixelColor), 1.0);
 }

@@ -6,6 +6,8 @@ import MaterialFactory from "./helpers/materialFactory";
 import SphereFactory from "./helpers/sphereFactory";
 import RandomHelper from "./helpers/randomHelper";
 import VectorHelper from "./helpers/vectorHelper";
+import CameraFactory from "./helpers/cameraFactory";
+import CameraHelper from "./helpers/cameraHelper";
 
 if (!navigator.gpu) {
     throw new Error("WebGPU not supported on this browser.");
@@ -83,41 +85,41 @@ const camera: Camera = {
         y:  2,
         z:  3,
     },
-    fvov: 20,
+    vfov: 20,
     lookAt: {
         x:  0,
         y:  0,
         z:  0,
     },
-    defocusAngle: 0,
+    defocusAngle: 0.1,
     vup: {
         x:  0,
         y:  1,
         z:  0,
     },
-    focusDistance: 10,
+    focusDistance: 10.0,
     imageWidth: canvas.width,
     padding: padding8b,
     imageHeight: canvas.height,
 }
 
 const params: ShaderParameters = {
-    maxBounces: 10,
-    samplesPerPixel: 10,
+    maxBounces: 5,
+    samplesPerPixel: 5,
 }
 
 const groundMaterial = MaterialFactory.createLambertian({x: 0.5, y: 0.5, z: 0.5});
 spheres.push(SphereFactory.createSphere(0,-1000,0,1000,groundMaterial));
 
-const range = 11;
+const range = 2;
 
 for (let a = -range; a < range; a++) {
     for (let b = -range; b < range; b++) {
         const chooseMaterial = RandomHelper.random();
         const center: Vector3 = {
-            x: a + 0.9 * RandomHelper.random(),
+            x: a * 2.5 + 0.9 * RandomHelper.random(),
             y: 0.2,
-            z: b + 0.9 * RandomHelper.random(),
+            z: b * 1.2 + 0.9 * RandomHelper.random(),
         }
 
         if (VectorHelper.magnitude(VectorHelper.subtract(center, {x:4,y:0.2,z:0})) > 0.9) {
@@ -159,8 +161,9 @@ spheres.push(SphereFactory.createSphere(4,1,0,1,material3));
 const spheresInfo = BufferFactory.prepareForBuffer(spheres);
 const bufferReadySpheres = new Float32Array(spheresInfo.data);
 
-const cameraInfo = BufferFactory.prepareForBuffer([camera]);
-const bufferReadyCamera = new Float32Array(cameraInfo.data);
+const cameraData = CameraFactory.createCameraData(camera);
+const cameraDataInfo = BufferFactory.prepareForBuffer([cameraData]);
+const bufferReadyCameraData = new Float32Array(cameraDataInfo.data);
 
 const shaderParamsInfo = BufferFactory.prepareForBuffer([params]);
 const bufferReadyShaderParams = new Float32Array(shaderParamsInfo.data);
@@ -171,9 +174,9 @@ const paramsUniformBuffer = device.createBuffer({
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 })
 
-const cameraUniformBuffer = device.createBuffer({
-    label: "camera",
-    size: cameraInfo.offset,
+const cameraDataUniformBuffer = device.createBuffer({
+    label: "camera data",
+    size: cameraDataInfo.offset,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 })
 
@@ -199,7 +202,6 @@ const vertexBufferLayout: GPUVertexBufferLayout = {
 };
 
 device.queue.writeBuffer(spheresStorageBuffer, 0, bufferReadySpheres);
-device.queue.writeBuffer(cameraUniformBuffer, 0, bufferReadyCamera);
 device.queue.writeBuffer(paramsUniformBuffer, 0, bufferReadyShaderParams);
 device.queue.writeBuffer(randomUniformBuffer, 0, randomValues);
 device.queue.writeBuffer(vertexBuffer, 0, square);
@@ -237,7 +239,7 @@ const bindGroup = device.createBindGroup({
         {
             binding: 0,
             resource: { 
-                buffer: cameraUniformBuffer,
+                buffer: cameraDataUniformBuffer,
             },
         },
         {
@@ -261,21 +263,56 @@ const bindGroup = device.createBindGroup({
     ],
 });
 
-const encoder = device.createCommandEncoder();
+let lastTime = performance.now();
+const fpsHistory: Array<number> = [];
+const maxSamples = 30;
+const fpsCounter = document.querySelector(".fps-counter");
 
-const pass = encoder.beginRenderPass({
-    colorAttachments: [{
-        view: context.getCurrentTexture().createView(),
-        loadOp: "clear",
-        storeOp: "store",
-    }]
-});
+function render() {
+    const time = performance.now();
+    const deltaTime = time - lastTime;
+    lastTime = time;
 
-pass.setPipeline(squareRenderPipeline);
-pass.setVertexBuffer(0, vertexBuffer);
-pass.setBindGroup(0, bindGroup);
-pass.draw(square.length / 2);
+    const fps = 1000 / deltaTime;
 
-pass.end();
+    fpsHistory.push(fps);
 
-device.queue.submit([encoder.finish()]);
+    if (fpsHistory.length > maxSamples) {
+        fpsHistory.shift();
+    }
+
+    const averageFPS = fpsHistory.reduce((sum, current) => sum + current, 0) / fpsHistory.length;
+
+    fpsCounter.textContent = `FPS: ${averageFPS.toFixed(2)}`;
+    
+    CameraHelper.rotateCamera(camera, deltaTime, Math.PI / 5000);
+
+    const cameraData = CameraFactory.createCameraData(camera);
+    const cameraDataInfo = BufferFactory.prepareForBuffer([cameraData]);
+    const bufferReadyCameraData = new Float32Array(cameraDataInfo.data);
+
+    device.queue.writeBuffer(cameraDataUniformBuffer, 0, bufferReadyCameraData);
+
+    const encoder = device.createCommandEncoder();
+
+    const pass = encoder.beginRenderPass({
+        colorAttachments: [{
+            view: context.getCurrentTexture().createView(),
+            loadOp: "clear",
+            storeOp: "store",
+        }]
+    });
+
+    pass.setPipeline(squareRenderPipeline);
+    pass.setVertexBuffer(0, vertexBuffer);
+    pass.setBindGroup(0, bindGroup);
+    pass.draw(square.length / 2);
+
+    pass.end();
+
+    device.queue.submit([encoder.finish()]);
+
+    requestAnimationFrame(render);
+}
+
+requestAnimationFrame(render);
