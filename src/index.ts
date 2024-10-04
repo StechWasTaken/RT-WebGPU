@@ -104,8 +104,8 @@ const camera: Camera = {
 }
 
 const params: ShaderParameters = {
-    maxBounces: 10,
-    samplesPerPixel: 4,
+    maxBounces: 5,
+    samplesPerPixel: 20,
 }
 
 const groundMaterial = MaterialFactory.createLambertian({x: 0.5, y: 0.5, z: 0.5});
@@ -215,8 +215,8 @@ const pipelineLayout = device.createPipelineLayout({
     bindGroupLayouts: [bindGroupLayout],
 });
 
-const squareRenderPipeline = device.createRenderPipeline({
-    label: "square render pipeline",
+const renderPipeline = device.createRenderPipeline({
+    label: "scene render pipeline",
     layout: pipelineLayout,
     vertex: {
         module: squareShaderModule,
@@ -233,8 +233,8 @@ const squareRenderPipeline = device.createRenderPipeline({
 });
 
 const bindGroup = device.createBindGroup({
-    label: "square renderer bind group",
-    layout: squareRenderPipeline.getBindGroupLayout(0),
+    label: "scene renderer bind group",
+    layout: renderPipeline.getBindGroupLayout(0),
     entries: [
         {
             binding: 0,
@@ -303,7 +303,7 @@ function render(time: number) {
         }]
     });
 
-    pass.setPipeline(squareRenderPipeline);
+    pass.setPipeline(renderPipeline);
     pass.setVertexBuffer(0, vertexBuffer);
     pass.setBindGroup(0, bindGroup);
     pass.draw(square.length / 2);

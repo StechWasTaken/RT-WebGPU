@@ -131,15 +131,8 @@ fn getRay(pos: vec2f, seed: ptr<function, u32>) -> Ray {
     return Ray(rayOrigin, rayDirection);
 }
 
-fn sampleRandomSquare(seed: ptr<function, u32>) -> vec2f {
+fn sampleSquare(seed: ptr<function, u32>) -> vec2f {
     return vec2f(random(seed) - 0.5, random(seed) - 0.5);
-}
-
-fn sampleSquare(samples: f32, index: f32) -> vec2f {
-    let width = sqrt(samples);
-    let x = index % width;
-    let y = floor(index / width);
-    return vec2f((x + 0.5) / width, (y + 0.5) / width);
 }
 
 fn defocusDiskSample(seed: ptr<function, u32>, center: vec3f) -> vec3f {
@@ -304,9 +297,9 @@ fn fragmentMain(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     var seed = rng * u32(dot(pos,pos)) / u32(pos.x);
     var pixelColor = vec3f(0,0,0);
 
-    let samples = pow(params.samplesPerPixel, 2);
+    let samples = params.samplesPerPixel;
     for (var sample = 0.0; sample < samples; sample += 1) {
-        let offset = sampleSquare(samples, sample);
+        let offset = sampleSquare(&seed);
         let ray = getRay(pos.xy + offset, &seed);
         let color = rayColor(&spheres, ray, &seed);
 
