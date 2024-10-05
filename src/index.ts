@@ -60,6 +60,13 @@ const bindGroupLayout = device.createBindGroupLayout({
                 type: "uniform",
             },
         },
+        {
+            binding: 4,
+            visibility: GPUShaderStage.FRAGMENT,
+            buffer: {
+                type: "read-only-storage",
+            }
+        }
     ],
 });
 
@@ -73,6 +80,7 @@ const randomUniformBuffer = device.createBuffer({
 });
 
 const spheres = new Array<Sphere>();
+const materials = new Array<Material>();
 
 const padding8b: Vector2 = {
     x: 0,
@@ -109,7 +117,14 @@ const params: ShaderParameters = {
 }
 
 const groundMaterial = MaterialFactory.createLambertian({x: 0.5, y: 0.5, z: 0.5});
-spheres.push(SphereFactory.createSphere(0,-1000,0,1000,groundMaterial));
+const material1 = MaterialFactory.createDielectric(1.5);
+const material2 = MaterialFactory.createLambertian({x: 0.4, y: 0.2, z: 0.1});
+const material3 = MaterialFactory.createMetal({x: 0.7, y: 0.6, z: 0.5}, 0.0);
+
+materials.push(groundMaterial);
+materials.push(material1);
+materials.push(material2);
+materials.push(material3);
 
 const range = 2;
 
@@ -122,11 +137,14 @@ for (let a = -range; a < range; a++) {
             z: b * 1.2 + 0.9 * RandomHelper.random(),
         }
 
+        const materialIndex = materials.length;
+
         if (VectorHelper.magnitude(VectorHelper.subtract(center, {x:4,y:0.2,z:0})) > 0.9) {
             if (chooseMaterial < 0.8) { // diffuse
                 const albedo = VectorHelper.multiply(RandomHelper.randomVector3(), RandomHelper.randomVector3());
                 const material = MaterialFactory.createLambertian(albedo);
-                const sphere = SphereFactory.createSphere(center.x, center.y, center.z, 0.2, material);
+                const sphere = SphereFactory.createSphere(center.x, center.y, center.z, 0.2, materialIndex);
+                materials.push(material);
                 spheres.push(sphere);
             }
             else if (chooseMaterial < 0.95) { // metal
@@ -137,26 +155,27 @@ for (let a = -range; a < range; a++) {
                 }
                 const fuzz = RandomHelper.randomRange(0, 0.5);
                 const material = MaterialFactory.createMetal(albedo, fuzz);
-                const sphere = SphereFactory.createSphere(center.x, center.y, center.z, 0.2, material);
+                const sphere = SphereFactory.createSphere(center.x, center.y, center.z, 0.2, materialIndex);
+                materials.push(material);
                 spheres.push(sphere);
             }
             else { // glass
                 const material = MaterialFactory.createDielectric(1.5);
-                const sphere = SphereFactory.createSphere(center.x, center.y, center.z, 0.2, material);
+                const sphere = SphereFactory.createSphere(center.x, center.y, center.z, 0.2, materialIndex);
+                materials.push(material);
                 spheres.push(sphere);
             }
         }
     }
 }
 
-const material1 = MaterialFactory.createDielectric(1.5);
-spheres.push(SphereFactory.createSphere(0,1,0,1,material1));
+spheres.push(SphereFactory.createSphere(0,-1000,0,1000,0));
+spheres.push(SphereFactory.createSphere(0,1,0,1,1));
+spheres.push(SphereFactory.createSphere(-4,1,0,1,2));
+spheres.push(SphereFactory.createSphere(4,1,0,1,3));
 
-const material2 = MaterialFactory.createLambertian({x: 0.4, y: 0.2, z: 0.1});
-spheres.push(SphereFactory.createSphere(-4,1,0,1,material2));
-
-const material3 = MaterialFactory.createMetal({x: 0.7, y: 0.6, z: 0.5}, 0.0);
-spheres.push(SphereFactory.createSphere(4,1,0,1,material3));
+const materialsInfo = BufferFactory.prepareForBuffer(materials);
+const bufferReadyMaterials = new Float32Array(materialsInfo.data);
 
 const spheresInfo = BufferFactory.prepareForBuffer(spheres);
 const bufferReadySpheres = new Float32Array(spheresInfo.data);
@@ -184,6 +203,12 @@ const spheresStorageBuffer = device.createBuffer({
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 
+const materialsStorageBuffer = device.createBuffer({
+    label: "object materials",
+    size: materialsInfo.offset,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+})
+
 const vertexBuffer = device.createBuffer({
     label: "square vertices",
     size: square.byteLength,
@@ -200,6 +225,7 @@ const vertexBufferLayout: GPUVertexBufferLayout = {
 };
 
 device.queue.writeBuffer(spheresStorageBuffer, 0, bufferReadySpheres);
+device.queue.writeBuffer(materialsStorageBuffer, 0, bufferReadyMaterials);
 device.queue.writeBuffer(randomUniformBuffer, 0, randomValues);
 device.queue.writeBuffer(vertexBuffer, 0, square);
 
@@ -255,6 +281,12 @@ const bindGroup = device.createBindGroup({
             binding: 3,
             resource: {
                 buffer: paramsUniformBuffer,
+            }
+        },
+        {
+            binding: 4,
+            resource: {
+                buffer: materialsStorageBuffer,
             }
         }
     ],

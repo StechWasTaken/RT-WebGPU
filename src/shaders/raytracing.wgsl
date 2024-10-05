@@ -2,13 +2,13 @@ struct Material {                               //              align(16)   size
     albedo: vec3f,                              // offset(0)    align(16)   size(12)
     fuzz: f32,                                  // offset(12)   align(4)    size(4)
     refractionIndex: f32,                       // offset(16)   align(4)    size(4)
-    @size(12) materialIndex: f32,               // offset(20)   align(12)   size(12)
+    @size(12) id: f32,                          // offset(20)   align(12)   size(12)
 }
 
 struct Sphere {                                 //              align(16)   size(48)
     center: vec3f,                              // offset(0)    align(16)   size(12)
     r: f32,                                     // offset(12)   align(4)    size(4)
-    material: Material,                         // offset(16)   align(16)   size(32)
+    @size(16) materialIndex: f32,               // offset(16)   align(16)   size(16)
 }
 
 struct Ray {                                    //              align(16)   size(32)
@@ -21,7 +21,7 @@ struct HitRecord {                              //              align(16)   size
     t: f32,                                     // offset(12)   align(4)    size(4)
     normal: vec3f,                              // offset(16)   align(16)   size(12)
     @size(4) frontFace: bool,                   // offset(28)   align(4)    size(4)
-    material: Material                          // offset(32)   align(16)   size(32)
+    @size(16) materialIndex: f32,               // offset(32)   align(16)   size(16)
 }
 
 struct Camera {                                 //              align(16)   size(80)
@@ -54,6 +54,7 @@ struct Parameters {                             //              align(4)    size
 @group(0) @binding(1) var<storage, read> spheres: array<Sphere>;
 @group(0) @binding(2) var<uniform> rng: u32;
 @group(0) @binding(3) var<uniform> params: Parameters;
+@group(0) @binding(4) var<storage, read> materials: array<Material>;
 
 fn lcg(modulus: u32, a: u32, c: u32, seed: ptr<function, u32>) -> u32 {
     let result = (a * (*seed) + c) % modulus;
@@ -161,8 +162,10 @@ fn hitSpheres(spheres: ptr<storage, array<Sphere>>, ray: Ray, record: ptr<functi
 }
 
 fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: HitRecord, attenuation: ptr<function, vec3f>, scattered: ptr<function, Ray>) -> bool {
-    
-    if (record.material.materialIndex == 1) { // lambertian
+    let index = u32(record.materialIndex);
+    let material = materials[index];
+
+    if (material.id == 1) { // lambertian
         var scatterDirection = record.normal + randomUnitVector(seed);
 
         if (nearZero(scatterDirection)) {
@@ -170,21 +173,21 @@ fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: HitRecord, attenu
         }
 
         *scattered = Ray(record.p, scatterDirection);
-        *attenuation = record.material.albedo;
+        *attenuation = material.albedo;
     }
-    else if (record.material.materialIndex == 2) { // metal
+    else if (material.id == 2) { // metal
         var reflected = reflect(incomingRay.direction, record.normal);
-        reflected = normalize(reflected) + (record.material.fuzz * randomUnitVector(seed));
+        reflected = normalize(reflected) + (material.fuzz * randomUnitVector(seed));
         *scattered = Ray(record.p, reflected);
-        *attenuation = record.material.albedo;
+        *attenuation = material.albedo;
     }
-    else if (record.material.materialIndex == 3) { // dielectric
+    else if (material.id == 3) { // dielectric
         *attenuation = vec3f(1.0, 1.0, 1.0);
         var ri: f32;
         if (record.frontFace) {
-            ri = 1.0 / record.material.refractionIndex;
+            ri = 1.0 / material.refractionIndex;
         } else {
-            ri = record.material.refractionIndex;
+            ri = material.refractionIndex;
         }
 
         let unitDirection = normalize(incomingRay.direction);
@@ -254,7 +257,7 @@ fn hit(sphere: Sphere, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32,
     record.p = at(ray, record.t);
     let outwardNormal = (record.p - sphere.center) / sphere.r;
     setFaceNormal(record, ray, outwardNormal);
-    record.material = sphere.material;
+    record.materialIndex = sphere.materialIndex;
 
     return true;
 }

@@ -4,7 +4,7 @@ export default class MaterialFactory {
             albedo: albedo,
             fuzz: 0,
             refractionIndex: 0,
-            materialIndex: 1,
+            id: 1,
             padding: {
                 x: 0,
                 y: 0,
@@ -17,7 +17,7 @@ export default class MaterialFactory {
             albedo: albedo,
             fuzz: fuzz,
             refractionIndex: 0,
-            materialIndex: 2,
+            id: 2,
             padding: {
                 x: 0,
                 y: 0,
@@ -34,7 +34,7 @@ export default class MaterialFactory {
             },
             fuzz: 0,
             refractionIndex: refractionIndex,
-            materialIndex: 3,
+            id: 3,
             padding: {
                 x: 0,
                 y: 0,

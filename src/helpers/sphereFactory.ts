@@ -1,5 +1,5 @@
 export default class SphereFactory {
-    static createSphere(x: number, y: number, z: number, r: number, material: Material): Sphere {
+    static createSphere(x: number, y: number, z: number, r: number, materialIndex: number): Sphere {
         return {
             center: {
                 x: x,
@@ -7,7 +7,12 @@ export default class SphereFactory {
                 z: z,
             },
             r: r,
-            material: material,
+            materialIndex: materialIndex,
+            padding: {
+                x: 0,
+                y: 0,
+                z: 0,
+            }
         }
     }
 }
