@@ -296,7 +296,36 @@ let lastTime = performance.now();
 let frameCount = 0;
 let fps = 60;
 let fpsUpdateTime = 0;
-const fpsCounter = document.querySelector(".fps-counter");
+let rotationVelocity = 0;
+const fpsCounter = document.querySelector("#fps-counter");
+const maxBouncesInput = document.querySelector("#max-bounces");
+const samplesPerPixelInput = document.querySelector('#samples-per-pixel');
+const rotationSpeedInput = document.querySelector('#rotation-speed');
+const labelMaxBouncesInput = document.querySelector("#label-max-bounces");
+const labelSamplesPerPixelInput = document.querySelector("#label-samples-per-pixel");
+const labelRotationSpeedInput = document.querySelector("#label-rotation-speed");
+
+maxBouncesInput.addEventListener('input', function(event) {
+    const target = event.target as HTMLInputElement;
+    params.maxBounces = parseInt(target.value);
+    const text = target.value.padStart(2, ' ');
+    labelMaxBouncesInput.textContent = `MAX BOUNCES PER RAY: ${text}x`;
+});
+
+samplesPerPixelInput.addEventListener('input', function(event) {
+    const target = event.target as HTMLInputElement;
+    params.samplesPerPixel = parseInt(target.value);
+    const text = target.value.padStart(2, ' ');
+    labelSamplesPerPixelInput.textContent = `SAMPLES PER PIXEL: ${text}x`;
+});
+
+rotationSpeedInput.addEventListener('input', function(event) {
+    const target = event.target as HTMLInputElement;
+    const value = parseInt(target.value);
+    rotationVelocity = value * Math.PI / 180;
+    const text = value.toString().padStart(3, ' ');
+    labelRotationSpeedInput.textContent = `ROTATION SPEED: ${text} deg p/s`
+});
 
 function render(time: number) {
     const deltaTime = time - lastTime;
@@ -310,17 +339,10 @@ function render(time: number) {
         fps = frameCount;
         frameCount = 0;
         fpsUpdateTime = 0;
-        fpsCounter.textContent = `FPS: ${fps.toFixed(2)}`;
-        if (fps < 60 && params.samplesPerPixel != 1) {
-            params.samplesPerPixel -= Math.floor((60 - fps) / 10 + 0.5);
-        }
-    
-        if (fps > 60) {
-            params.samplesPerPixel += Math.floor((fps - 60) / 10 + 0.5);
-        }
+        fpsCounter.textContent = `FPS: ${fps}`;
     }
     
-    CameraHelper.rotateCamera(camera, deltaTime, Math.PI / 5000);
+    CameraHelper.rotateCamera(camera, deltaTime, rotationVelocity);
 
     const cameraData = CameraFactory.createCameraData(camera);
     const cameraDataInfo = BufferFactory.prepareForBuffer([cameraData]);
