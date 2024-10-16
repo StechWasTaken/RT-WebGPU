@@ -4,10 +4,17 @@ declare module '*.wgsl' {
 }
 
 interface Sphere {
-    center: Vector3,
-    r: number,
+    center: Ray,
     materialIndex: number,
-    padding: Vector3,
+    r: number,
+    padding: Vector2,
+}
+
+interface Ray {
+    origin: Vector3,
+    time: number,
+    direction: Vector3,
+    padding: number,
 }
 
 interface Material {

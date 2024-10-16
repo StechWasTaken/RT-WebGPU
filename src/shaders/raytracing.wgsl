@@ -6,17 +6,19 @@ struct Material {                               //              align(16)   size
 }
 
 struct Sphere {                                 //              align(16)   size(48)
-    center: vec3f,                              // offset(0)    align(16)   size(12)
-    r: f32,                                     // offset(12)   align(4)    size(4)
-    @size(16) materialIndex: f32,               // offset(16)   align(16)   size(16)
+    center: Ray,                                // offset(0)    align(16)   size(32)
+    materialIndex: f32,                         // offset(32)   align(4)    size(4)
+    r: f32,                                     // offset(36)   align(4)    size(4)
+    // -- implicit member alignment padding --  // offset(40)               size(8)
 }
 
 struct Ray {                                    //              align(16)   size(32)
-    @size(16) origin: vec3f,                    // offset(0)    align(16)   size(16)
+    origin: vec3f,                              // offset(0)    align(16)   size(12)
+    time: f32,                                  // offset(12)   align(4)    size(4)
     @size(16) direction: vec3f,                 // offset(16)   align(16)   size(16)
 }
 
-struct HitRecord {                              //              align(16)   size(64)
+struct HitRecord {                              //              align(16)   size(48)
     p: vec3f,                                   // offset(0)    align(16)   size(12)
     t: f32,                                     // offset(12)   align(4)    size(4)
     normal: vec3f,                              // offset(16)   align(16)   size(12)
@@ -24,7 +26,7 @@ struct HitRecord {                              //              align(16)   size
     @size(16) materialIndex: f32,               // offset(32)   align(16)   size(16)
 }
 
-struct Camera {                                 //              align(16)   size(80)
+struct Camera {                                 //              align(16)   size(64)
     lookFrom: vec3f,                            // offset(0)    align(16)   size(12)
     fvov: f32,                                  // offset(12)   align(4)    size(4)
     lookAt: vec3f,                              // offset(16)   align(16)   size(12)
@@ -36,7 +38,7 @@ struct Camera {                                 //              align(16)   size
 }
 
 struct CameraData {
-    @size(16) lookFrom: vec3f,                  // offset(0)    align(16)   size(96)
+    @size(16) lookFrom: vec3f,                  // offset(0)    align(16)   size(80)
     @size(16) pixel00Location: vec3f,           // offset(16)   align(16)   size(16)     
     @size(16) pixelDeltaU: vec3f,               // offset(32)   align(16)   size(16)                     
     @size(16) pixelDeltaV: vec3f,               // offset(48)   align(16)   size(16)     
@@ -128,8 +130,9 @@ fn getRay(pos: vec2f, seed: ptr<function, u32>) -> Ray {
         rayOrigin = defocusDiskSample(seed, center);
     }
     let rayDirection = pixelSample - rayOrigin;
+    let rayTime = 1.0 - pow(random(seed), 5);
 
-    return Ray(rayOrigin, rayDirection);
+    return Ray(rayOrigin, rayTime, rayDirection);
 }
 
 fn sampleSquare(seed: ptr<function, u32>) -> vec2f {
@@ -172,13 +175,13 @@ fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: HitRecord, attenu
             scatterDirection = record.normal;
         }
 
-        *scattered = Ray(record.p, scatterDirection);
+        *scattered = Ray(record.p, incomingRay.time, scatterDirection);
         *attenuation = material.albedo;
     }
     else if (material.id == 2) { // metal
         var reflected = reflect(incomingRay.direction, record.normal);
         reflected = normalize(reflected) + (material.fuzz * randomUnitVector(seed));
-        *scattered = Ray(record.p, reflected);
+        *scattered = Ray(record.p, incomingRay.time, reflected);
         *attenuation = material.albedo;
     }
     else if (material.id == 3) { // dielectric
@@ -204,7 +207,7 @@ fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: HitRecord, attenu
             direction = refract(unitDirection, record.normal, ri);
         }
 
-        *scattered = Ray(record.p, direction); 
+        *scattered = Ray(record.p, incomingRay.time, direction); 
     }
 
     return true;
@@ -233,7 +236,8 @@ fn refract(uv: vec3f, n: vec3f, etaIoverEtaT: f32) -> vec3f {
 }
 
 fn hit(sphere: Sphere, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32, rayTmax: f32) -> bool {
-    let oc = sphere.center - ray.origin;
+    let currentCenter = at(sphere.center, ray.time);
+    let oc = currentCenter - ray.origin;
     let a = dot(ray.direction, ray.direction);
     let h = dot(ray.direction, oc);
     let c = dot(oc, oc) - sphere.r * sphere.r;
@@ -255,7 +259,7 @@ fn hit(sphere: Sphere, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32,
 
     record.t = root;
     record.p = at(ray, record.t);
-    let outwardNormal = (record.p - sphere.center) / sphere.r;
+    let outwardNormal = (record.p - currentCenter) / sphere.r;
     setFaceNormal(record, ray, outwardNormal);
     record.materialIndex = sphere.materialIndex;
 
@@ -290,6 +294,10 @@ fn rayColor(spheres: ptr<storage, array<Sphere>>, ray: Ray, seed: ptr<function, 
     return color;
 }
 
+fn luminance(color: vec3f) -> f32 {
+    return dot(color, vec3f(0.299, 0.587, 0.114));
+}
+
 @vertex
 fn vertexMain(@location(0) pos: vec2f) -> @builtin(position) vec4f {
     return vec4f(pos, 0, 1);
@@ -303,7 +311,7 @@ fn fragmentMain(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     let samples = params.samplesPerPixel;
     for (var sample = 0.0; sample < samples; sample += 1) {
         let offset = sampleSquare(&seed);
-        let ray = getRay(pos.xy + offset, &seed);
+        var ray = getRay(pos.xy + offset, &seed);
         let color = rayColor(&spheres, ray, &seed);
 
         pixelColor += color;

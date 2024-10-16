@@ -143,7 +143,7 @@ for (let a = -range; a < range; a++) {
             if (chooseMaterial < 0.8) { // diffuse
                 const albedo = VectorHelper.multiply(RandomHelper.randomVector3(), RandomHelper.randomVector3());
                 const material = MaterialFactory.createLambertian(albedo);
-                const sphere = SphereFactory.createSphere(center.x, center.y, center.z, 0.2, materialIndex);
+                const sphere = SphereFactory.createStationarySphere(center, 0.2, materialIndex);
                 materials.push(material);
                 spheres.push(sphere);
             }
@@ -155,13 +155,13 @@ for (let a = -range; a < range; a++) {
                 }
                 const fuzz = RandomHelper.randomRange(0, 0.5);
                 const material = MaterialFactory.createMetal(albedo, fuzz);
-                const sphere = SphereFactory.createSphere(center.x, center.y, center.z, 0.2, materialIndex);
+                const sphere = SphereFactory.createStationarySphere(center, 0.2, materialIndex);
                 materials.push(material);
                 spheres.push(sphere);
             }
             else { // glass
                 const material = MaterialFactory.createDielectric(1.5);
-                const sphere = SphereFactory.createSphere(center.x, center.y, center.z, 0.2, materialIndex);
+                const sphere = SphereFactory.createStationarySphere(center, 0.2, materialIndex);
                 materials.push(material);
                 spheres.push(sphere);
             }
@@ -169,10 +169,10 @@ for (let a = -range; a < range; a++) {
     }
 }
 
-spheres.push(SphereFactory.createSphere(0,-1000,0,1000,0));
-spheres.push(SphereFactory.createSphere(0,1,0,1,1));
-spheres.push(SphereFactory.createSphere(-4,1,0,1,2));
-spheres.push(SphereFactory.createSphere(4,1,0,1,3));
+spheres.push(SphereFactory.createStationarySphere({x: 0, y: -1000, z: 0}, 1000, 0));
+spheres.push(SphereFactory.createStationarySphere({x: 0, y: 1, z: 0},1 ,1 ));
+spheres.push(SphereFactory.createStationarySphere({x: -4, y: 1, z:0},1 ,2 ));
+spheres.push(SphereFactory.createStationarySphere({x: 4, y: 1, z: 0},1 ,3 ));
 
 const materialsInfo = BufferFactory.prepareForBuffer(materials);
 const bufferReadyMaterials = new Float32Array(materialsInfo.data);
