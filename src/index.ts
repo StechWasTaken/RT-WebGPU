@@ -99,7 +99,7 @@ const camera: Camera = {
         y:  0,
         z:  0,
     },
-    defocusAngle: 0.1,
+    defocusAngle: 0,
     vup: {
         x:  0,
         y:  1,
@@ -113,7 +113,7 @@ const camera: Camera = {
 
 const params: ShaderParameters = {
     maxBounces: 5,
-    samplesPerPixel: 1,
+    samplesPerPixel: 0,
 }
 
 const groundMaterial = MaterialFactory.createLambertian({x: 0.5, y: 0.5, z: 0.5});

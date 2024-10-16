@@ -306,18 +306,19 @@ fn vertexMain(@location(0) pos: vec2f) -> @builtin(position) vec4f {
 @fragment
 fn fragmentMain(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     var seed = rng * u32(dot(pos,pos)) / u32(pos.x);
-    var pixelColor = vec3f(0,0,0);
+    let initRay = getRay(pos.xy, &seed);
+    var pixelColor = rayColor(&spheres, initRay, &seed);
 
     let samples = params.samplesPerPixel;
     for (var sample = 0.0; sample < samples; sample += 1) {
         let offset = sampleSquare(&seed);
-        var ray = getRay(pos.xy + offset, &seed);
+        let ray = getRay(pos.xy + offset, &seed);
         let color = rayColor(&spheres, ray, &seed);
 
         pixelColor += color;
     }
 
-    pixelColor /= samples;
+    pixelColor /= samples + 1;
 
     return vec4f(sqrt(pixelColor), 1.0);
 }
