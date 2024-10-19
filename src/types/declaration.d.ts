@@ -33,26 +33,20 @@ interface Camera  {
     vup: Vector3,
     focusDistance: number,
     imageWidth: number,
-    padding: Vector2,
     imageHeight: number,
 }
 
-interface CameraData {
+interface CameraViewData {
     lookFrom: Vector3,
-    padding1: number,
     pixel00Location: Vector3,
-    padding2: number,
     pixelDeltaU: Vector3,
-    padding3: number,
     pixelDeltaV: Vector3,
-    padding4: number,
     defocusDiskU: Vector3,
-    padding5: number,
     defocusDiskV: Vector3,
     defocusAngle: number,
 }
 
-interface ShaderParameters {
+interface ShaderConfig {
     maxBounces: number,
     samplesPerPixel: number,
 }

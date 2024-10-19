@@ -1,7 +1,7 @@
-import VectorHelper from "./vectorHelper";
+import VectorHelper from "./vector-helper";
 
 export default class CameraFactory {
-    static createCameraData(camera: Camera): CameraData {
+    static createCameraData(camera: Camera): CameraViewData {
         const theta = camera.vfov * (Math.PI / 180.0);
         const h = Math.tan(theta / 2.0);
         const viewportHeight = 2.0 * h * camera.focusDistance;
@@ -50,15 +50,10 @@ export default class CameraFactory {
         
         return {
             lookFrom: camera.lookFrom,
-            padding1: 0,
             pixel00Location: pixel00Location,
-            padding2: 0,
             pixelDeltaU: pixelDeltaU,
-            padding3: 0,
             pixelDeltaV: pixelDeltaV,
-            padding4: 0,
             defocusDiskU: defocusDiskU,
-            padding5: 0,
             defocusDiskV: defocusDiskV,
             defocusAngle: camera.defocusAngle,
         }

@@ -1,4 +1,4 @@
-import VectorHelper from "./vectorHelper";
+import VectorHelper from "./vector-helper";
 
 export default class SphereFactory {
     static createStationarySphere(center: Vector3, r: number, materialIndex: number): Sphere {
