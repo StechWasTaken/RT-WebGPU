@@ -9,6 +9,8 @@ export default class CameraViewData implements Serializable {
     defocusDiskU: Vector3 = new Vector3(0,0,0);
     defocusDiskV: Vector3 = new Vector3(0,0,0);
     defocusAngle: number = 0;
+    size: number = 96;
+    align: number = 16;
 
     /**
      * align(16) size(96)

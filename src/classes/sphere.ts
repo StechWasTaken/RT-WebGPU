@@ -1,13 +1,16 @@
 import Serializable from "../interfaces/serializable";
+import Material from "./material";
 import Ray from "./ray";
+import Vector3 from "./vector3";
 
 export default class Sphere implements Serializable {
     center: Ray;
-    materialIndex: number;
     r: number;
+    materialIndex: number;
 
-    constructor(center: Ray, r: number, materialIndex: number) {
-        this.center = center;
+    constructor(center: Vector3, r: number, materialIndex: number) {
+        const direction = new Vector3(0,0,0);
+        this.center = new Ray(center, direction, 0);
         this.materialIndex = materialIndex;
         this.r = r;
     }

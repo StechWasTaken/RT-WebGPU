@@ -99,6 +99,12 @@ export default class Vector3 implements Serializable, Vector<Vector3> {
      * @returns {Float32Array}
      */
     encode(): Float32Array {
-        return new Float32Array([this.x, this.y, this.z, 0]);
+        const buffer = new Float32Array(4);
+
+        buffer[0] = this.x;
+        buffer[1] = this.y;
+        buffer[2] = this.z;
+
+        return buffer;
     }
 }

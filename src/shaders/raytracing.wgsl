@@ -2,28 +2,31 @@ struct Material {                               //              align(16)   size
     albedo: vec3f,                              // offset(0)    align(16)   size(12)
     fuzz: f32,                                  // offset(12)   align(4)    size(4)
     refractionIndex: f32,                       // offset(16)   align(4)    size(4)
-    @size(12) id: f32,                          // offset(20)   align(12)   size(12)
+    id: f32,                                    // offset(20)   align(4)    size(4)
+    // -- implicit struct size padding --       // offset(24)               size(8)
 }
 
 struct Sphere {                                 //              align(16)   size(48)
     center: Ray,                                // offset(0)    align(16)   size(32)
     materialIndex: f32,                         // offset(32)   align(4)    size(4)
     r: f32,                                     // offset(36)   align(4)    size(4)
-    // -- implicit member alignment padding --  // offset(40)               size(8)
+    // -- implicit struct size padding --       // offset(40)               size(8)
 }
 
 struct Ray {                                    //              align(16)   size(32)
     origin: vec3f,                              // offset(0)    align(16)   size(12)
     time: f32,                                  // offset(12)   align(4)    size(4)
-    @size(16) direction: vec3f,                 // offset(16)   align(16)   size(16)
+    direction: vec3f,                           // offset(16)   align(16)   size(12)
+    // -- implicit struct size padding --       // offset(28)               size(4)
 }
 
 struct HitRecord {                              //              align(16)   size(48)
     p: vec3f,                                   // offset(0)    align(16)   size(12)
     t: f32,                                     // offset(12)   align(4)    size(4)
     normal: vec3f,                              // offset(16)   align(16)   size(12)
-    @size(4) frontFace: bool,                   // offset(28)   align(4)    size(4)
-    @size(16) materialIndex: f32,               // offset(32)   align(16)   size(16)
+    materialIndex: f32,                         // offset(28)   align(4)    size(4)
+    frontFace: bool,                            // offset(32)   align(1)    size(1)
+    // -- implicit struct size padding --       // offset(33)               size(11)
 }
 
 struct Camera {                                 //              align(16)   size(64)
@@ -37,12 +40,17 @@ struct Camera {                                 //              align(16)   size
     imageHeight: f32,                           // offset(60)   align(4)    size(4)
 }
 
-struct CameraData {
-    @size(16) lookFrom: vec3f,                  // offset(0)    align(16)   size(80)
-    @size(16) pixel00Location: vec3f,           // offset(16)   align(16)   size(16)     
-    @size(16) pixelDeltaU: vec3f,               // offset(32)   align(16)   size(16)                     
-    @size(16) pixelDeltaV: vec3f,               // offset(48)   align(16)   size(16)     
-    @size(16) defocusDiskU: vec3f,              // offset(64)   align(16)   size(16)     
+struct CameraData {                             //              align(16)   size(96)
+    lookFrom: vec3f,                            // offset(0)    align(16)   size(12)
+    // -- implicit member alignment padding --  // offset(12)               size(4)
+    pixel00Location: vec3f,                     // offset(16)   align(16)   size(12)
+    // -- implicit member alignment padding --  // offset(28)               size(4)   
+    pixelDeltaU: vec3f,                         // offset(32)   align(16)   size(12)
+    // -- implicit member alignment padding --  // offset(44)               size(4)                   
+    pixelDeltaV: vec3f,                         // offset(48)   align(16)   size(12)   
+    // -- implicit member alignment padding --  // offset(60)               size(4)
+    defocusDiskU: vec3f,                        // offset(64)   align(16)   size(12)   
+    // -- implicit member alignment padding --  // offset(76)               size(4)
     defocusDiskV: vec3f,                        // offset(80)   align(16)   size(12)
     defocusAngle: f32,                          // offset(92)   align(4)    size(4)    
 }
@@ -108,8 +116,8 @@ fn randomOnHemisphere(normal: vec3f, seed: ptr<function, u32>) -> vec3f {
     }
 }
 
-fn setFaceNormal(record: ptr<function, HitRecord>, ray: Ray, outwardNormal: vec3f) {
-    let a = dot(ray.direction, outwardNormal);
+fn setFaceNormal(record: ptr<function, HitRecord>, rayDirection: vec3f, outwardNormal: vec3f) {
+    let a = dot(rayDirection, outwardNormal);
     if (a < 0) {
         record.frontFace = true;
         record.normal = outwardNormal;
@@ -130,7 +138,7 @@ fn getRay(pos: vec2f, seed: ptr<function, u32>) -> Ray {
         rayOrigin = defocusDiskSample(seed, center);
     }
     let rayDirection = pixelSample - rayOrigin;
-    let rayTime = 1.0 - pow(random(seed), 5);
+    let rayTime = random(seed);
 
     return Ray(rayOrigin, rayTime, rayDirection);
 }
@@ -149,24 +157,33 @@ fn at(ray: Ray, t: f32) -> vec3f {
 }
 
 fn hitSpheres(spheres: ptr<storage, array<Sphere>>, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32, rayTmax: f32) -> bool {
-    let tempRecord: ptr<function, HitRecord> = record;
+    var tempRecord = HitRecord();
     var hitAnything = false;
     var closestSoFar = rayTmax;
 
-    for (var i: u32 = 0; i < arrayLength(spheres); i++) {
-        if (hit(spheres[i], ray, tempRecord, rayTmin, closestSoFar)) {
+    var i = 0u;
+    loop {
+        if i == arrayLength(spheres) {
+            break;
+        }
+
+        let sphere = spheres[i];
+
+        if (hit(sphere, ray, &tempRecord, rayTmin, closestSoFar)) {
             hitAnything = true;
             closestSoFar = tempRecord.t;
-            *record = *tempRecord;
+            *record = tempRecord;
         }
+
+        i++;
     }
 
     return hitAnything;
 }
 
-fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: HitRecord, attenuation: ptr<function, vec3f>, scattered: ptr<function, Ray>) -> bool {
+fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: ptr<function, HitRecord>, attenuation: ptr<function, vec3f>, scattered: ptr<function, Ray>) -> bool {
     let index = u32(record.materialIndex);
-    let material = materials[index];
+    let material = &materials[index];
 
     if (material.id == 1) { // lambertian
         var scatterDirection = record.normal + randomUnitVector(seed);
@@ -186,11 +203,11 @@ fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: HitRecord, attenu
     }
     else if (material.id == 3) { // dielectric
         *attenuation = vec3f(1.0, 1.0, 1.0);
-        var ri: f32;
+
+        var ri = material.refractionIndex;
+
         if (record.frontFace) {
             ri = 1.0 / material.refractionIndex;
-        } else {
-            ri = material.refractionIndex;
         }
 
         let unitDirection = normalize(incomingRay.direction);
@@ -259,8 +276,8 @@ fn hit(sphere: Sphere, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32,
 
     record.t = root;
     record.p = at(ray, record.t);
-    let outwardNormal = (record.p - currentCenter) / sphere.r;
-    setFaceNormal(record, ray, outwardNormal);
+    let outwardNormal = normalize(record.p - currentCenter);
+    setFaceNormal(record, ray.direction, outwardNormal);
     record.materialIndex = sphere.materialIndex;
 
     return true;
@@ -270,25 +287,34 @@ fn rayColor(spheres: ptr<storage, array<Sphere>>, ray: Ray, seed: ptr<function, 
     var color = vec3f(1.0, 1.0, 1.0);
     var currentRay = ray;
 
-    var i: u32;
-    for (i = 0; i < u32(params.maxBounces); i++) {
+    let maxBounces = u32(params.maxBounces);
+    var i: u32 = 0;
+    
+    loop {
+        if i == maxBounces {
+            break;
+        }
+
         var record = HitRecord();
 
-        if (hitSpheres(spheres, currentRay, &record, 0.001, 1e16)) {
-            var scattered: Ray;
-            var attenuation: vec3f;
-            if (scatter(seed, currentRay, record, &attenuation, &scattered)) {
-                currentRay = scattered;
-                color *= attenuation;
-            } else {
-                return vec3f(0,0,0);
-            }
-        } else {
+        if (!hitSpheres(spheres, currentRay, &record, 0.001, 1e16)) {
             let unitDirection = normalize(currentRay.direction);
             let a = 0.5 * (unitDirection.y + 1.0);
             color *= (1.0 - a) * vec3f(1.0, 1.0, 1.0) + a * vec3f(0.5, 0.7, 1.0); 
             break;
         }
+
+        var scattered: Ray;
+        var attenuation: vec3f;
+
+        if (!scatter(seed, currentRay, &record, &attenuation, &scattered)) {
+            return vec3f(0);
+        }
+
+        currentRay = scattered;
+        color *= attenuation;
+
+        i++;
     }
 
     return color;
@@ -309,16 +335,23 @@ fn fragmentMain(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     let initRay = getRay(pos.xy, &seed);
     var pixelColor = rayColor(&spheres, initRay, &seed);
 
-    let samples = params.samplesPerPixel;
-    for (var sample = 0.0; sample < samples; sample += 1) {
+    let samples = u32(params.samplesPerPixel);
+    var i = 0u;
+    loop {
+        if i == samples {
+            break;
+        }
+
         let offset = sampleSquare(&seed);
         let ray = getRay(pos.xy + offset, &seed);
         let color = rayColor(&spheres, ray, &seed);
 
         pixelColor += color;
+
+        i++;
     }
 
-    pixelColor /= samples + 1;
+    pixelColor /= params.samplesPerPixel + 1;
 
-    return vec4f(sqrt(pixelColor), 1.0);
+    return vec4f(sqrt(pixelColor), 1);
 }

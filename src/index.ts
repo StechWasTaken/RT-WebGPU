@@ -1,16 +1,15 @@
-import squareShader from "./shaders/square.wgsl";
 import raytracingShader from "./shaders/raytracing.wgsl";
 import square from "./shapes/square";
-import BufferFactory from "./helpers/buffer-factory";
-import MaterialFactory from "./helpers/material-factory";
-import SphereFactory from "./helpers/sphere-factory";
 import RandomHelper from "./helpers/random-helper";
-import VectorHelper from "./helpers/vector-helper";
-import CameraFactory from "./helpers/camera-factory";
-import CameraHelper from "./helpers/camera-helper";
 import Camera from "./classes/camera";
 import Vector3 from "./classes/vector3";
 import ShaderConfig from "./classes/shader-config";
+import Sphere from "./classes/sphere";
+import Lambertian from "./classes/lambertian";
+import Material from "./classes/material";
+import Dielectric from "./classes/dielectric";
+import Metal from "./classes/metal";
+import ArrayEncoder from "./helpers/array-encoder";
 
 if (!navigator.gpu) {
     throw new Error("WebGPU not supported on this browser.");
@@ -68,8 +67,8 @@ const bindGroupLayout = device.createBindGroupLayout({
             visibility: GPUShaderStage.FRAGMENT,
             buffer: {
                 type: "read-only-storage",
-            }
-        }
+            },
+        },
     ],
 });
 
@@ -101,73 +100,65 @@ const params = new ShaderConfig(
     0,
 );
 
-const groundMaterial = MaterialFactory.createLambertian({x: 0.5, y: 0.5, z: 0.5});
-const material1 = MaterialFactory.createDielectric(1.5);
-const material2 = MaterialFactory.createLambertian({x: 0.4, y: 0.2, z: 0.1});
-const material3 = MaterialFactory.createMetal({x: 0.7, y: 0.6, z: 0.5}, 0.0);
+const groundMaterial = new Lambertian(new Vector3(0.5,0.5,0.5));
+const material1 = new Dielectric(1.5);
+const material2 = new Lambertian(new Vector3(0.4,0.2,0.1));
+const material3 = new Metal(new Vector3(0.7,0.6,0.5), 0);
 
 materials.push(groundMaterial);
 materials.push(material1);
 materials.push(material2);
 materials.push(material3);
 
-const range = 11;
+const range = 2;
 
 for (let a = -range; a < range; a++) {
     for (let b = -range; b < range; b++) {
-        const chooseMaterial = RandomHelper.random();
+        const chooseMaterial = Math.random();
         const center = new Vector3(
-            a * 2.5 + 0.9 * RandomHelper.random(),
+            a * 2.5 + 0.9 * Math.random(),
             0.2,
-            b * 1.2 + 0.9 * RandomHelper.random(),
+            b * 1.2 + 0.9 * Math.random(),
         );
 
         const materialIndex = materials.length;
 
-        if (VectorHelper.magnitude(VectorHelper.subtract(center, {x:4,y:0.2,z:0})) > 0.9) {
+        if (center.subtract(new Vector3(4,0.2,0)).magnitude() > 0.9) {
+            const sphere = new Sphere(center, 0.2, materialIndex);
+
+            spheres.push(sphere);
+
             if (chooseMaterial < 0.8) { // diffuse
-                const albedo = VectorHelper.multiply(RandomHelper.randomVector3(), RandomHelper.randomVector3());
-                const material = MaterialFactory.createLambertian(albedo);
-                const sphere = SphereFactory.createStationarySphere(center, 0.2, materialIndex);
+                const randomVector = RandomHelper.randomVector3();
+                const albedo = randomVector.multiply(randomVector);
+                const material = new Lambertian(albedo);
                 materials.push(material);
-                spheres.push(sphere);
             }
             else if (chooseMaterial < 0.95) { // metal
-                const albedo = new Vector3(
-                    RandomHelper.randomRange(0.5, 1),
-                    RandomHelper.randomRange(0.5, 1),
-                    RandomHelper.randomRange(0.5, 1),
-                );
+                const albedo = RandomHelper.randomVector3(0.5, 1);
 
                 const fuzz = RandomHelper.randomRange(0, 0.5);
-                const material = MaterialFactory.createMetal(albedo, fuzz);
-                const sphere = SphereFactory.createStationarySphere(center, 0.2, materialIndex);
+                const material = new Metal(albedo, fuzz);
                 materials.push(material);
-                spheres.push(sphere);
             }
             else { // glass
-                const material = MaterialFactory.createDielectric(1.5);
-                const sphere = SphereFactory.createStationarySphere(center, 0.2, materialIndex);
+                const material = new Dielectric(1.5);
                 materials.push(material);
-                spheres.push(sphere);
             }
         }
     }
 }
 
-spheres.push(SphereFactory.createStationarySphere({x: 0, y: -1000, z: 0}, 1000, 0));
-spheres.push(SphereFactory.createStationarySphere({x: 0, y: 1, z: 0},1 ,1 ));
-spheres.push(SphereFactory.createStationarySphere({x: -4, y: 1, z:0},1 ,2 ));
-spheres.push(SphereFactory.createStationarySphere({x: 4, y: 1, z: 0},1 ,3 ));
+spheres.push(new Sphere(new Vector3(0,-1000,0), 1000, 0));
+spheres.push(new Sphere(new Vector3(0,1,0), 1, 1));
+spheres.push(new Sphere(new Vector3(-4,1,0), 1, 2));
+spheres.push(new Sphere(new Vector3(4,1,0), 1, 3));
 
-const materialsInfo = BufferFactory.prepareForBuffer(materials);
-const bufferReadyMaterials = new Float32Array(materialsInfo.data);
+const bufferReadyMaterials = ArrayEncoder.encode(materials, 8);
 
-const spheresInfo = BufferFactory.prepareForBuffer(spheres);
-const bufferReadySpheres = new Float32Array(spheresInfo.data);
+const bufferReadySpheres = ArrayEncoder.encode(spheres, 12);
 
-const cameraData = camera.computeViewData();
-const bufferReadyCameraData = cameraData.encode();
+const bufferReadyCameraData = camera.computeViewData().encode();
 
 const shaderConfigBuffer = params.encode();
 
@@ -185,13 +176,13 @@ const cameraViewDataUniformBuffer = device.createBuffer({
 
 const spheresStorageBuffer = device.createBuffer({
     label: "sphere instances",
-    size: spheresInfo.offset,
+    size: bufferReadySpheres.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 
 const materialsStorageBuffer = device.createBuffer({
     label: "object materials",
-    size: materialsInfo.offset,
+    size: bufferReadyMaterials.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 })
 
@@ -210,13 +201,13 @@ const vertexBufferLayout: GPUVertexBufferLayout = {
     }],
 };
 
-device.queue.writeBuffer(spheresStorageBuffer, 0, bufferReadySpheres);
 device.queue.writeBuffer(materialsStorageBuffer, 0, bufferReadyMaterials);
+device.queue.writeBuffer(spheresStorageBuffer, 0, bufferReadySpheres);
 device.queue.writeBuffer(randomUniformBuffer, 0, randomValues);
 device.queue.writeBuffer(vertexBuffer, 0, square);
 
 const squareShaderModule = device.createShaderModule({
-    label: "square shader",
+    label: "raytracing shader",
     code: raytracingShader,
 });
 
@@ -283,6 +274,7 @@ let frameCount = 0;
 let fps = 60;
 let fpsUpdateTime = 0;
 let angularVelocity = 0;
+
 const fpsCounter = document.querySelector("#fps-counter");
 const maxBouncesInput = document.querySelector("#max-bounces");
 const samplesPerPixelInput = document.querySelector('#samples-per-pixel');
@@ -313,7 +305,7 @@ rotationSpeedInput.addEventListener('input', function(event) {
     labelRotationSpeedInput.textContent = `ROTATION SPEED: ${text} deg p/s`
 });
 
-function render(time: number) {
+function render(time: DOMHighResTimeStamp) {
     const deltaTime = time - lastTime;
     lastTime = time;
 

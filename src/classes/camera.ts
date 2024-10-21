@@ -11,6 +11,8 @@ export default class Camera implements Serializable {
     focusDistance: number;
     imageWidth: number;
     imageHeight: number;
+    size: number = 64;
+    align: number = 16;
 
     constructor(
         lookFrom: Vector3,
