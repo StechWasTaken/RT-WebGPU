@@ -1,7 +1,6 @@
-import Serializable from "../interfaces/serializable";
-import Material from "./material";
-import Ray from "./ray";
-import Vector3 from "./vector3";
+import Serializable from "../../interfaces/serializable";
+import Ray from "../ray";
+import Vector3 from "../vector3";
 
 export default class Sphere implements Serializable {
     center: Ray;

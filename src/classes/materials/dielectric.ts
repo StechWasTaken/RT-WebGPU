@@ -1,5 +1,4 @@
 import Material from "./material";
-import Vector3 from "./vector3";
 
 export default class Dielectric extends Material {
     static readonly ID: number = 3;

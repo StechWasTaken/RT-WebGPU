@@ -1,14 +1,14 @@
 import raytracingShader from "./shaders/raytracing.wgsl";
-import square from "./shapes/square";
+import Square from "./classes/shapes/square";
+import Sphere from "./classes/shapes/sphere";
 import RandomHelper from "./helpers/random-helper";
 import Camera from "./classes/camera";
 import Vector3 from "./classes/vector3";
 import ShaderConfig from "./classes/shader-config";
-import Sphere from "./classes/sphere";
-import Lambertian from "./classes/lambertian";
-import Material from "./classes/material";
-import Dielectric from "./classes/dielectric";
-import Metal from "./classes/metal";
+import Lambertian from "./classes/materials/lambertian";
+import Material from "./classes/materials/material";
+import Dielectric from "./classes/materials/dielectric";
+import Metal from "./classes/materials/metal";
 import ArrayEncoder from "./helpers/array-encoder";
 
 if (!navigator.gpu) {
@@ -161,6 +161,8 @@ const bufferReadySpheres = ArrayEncoder.encode(spheres, 12);
 const bufferReadyCameraData = camera.computeViewData().encode();
 
 const shaderConfigBuffer = params.encode();
+
+const square = new Square().encode();
 
 const paramsUniformBuffer = device.createBuffer({
     label: "shader params",

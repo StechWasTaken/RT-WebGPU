@@ -1,6 +1,6 @@
-import MaterialOptions from "../interfaces/material-options";
-import Serializable from "../interfaces/serializable";
-import Vector3 from "./vector3";
+import MaterialOptions from "../../interfaces/material-options";
+import Serializable from "../../interfaces/serializable";
+import Vector3 from "../vector3";
 
 export default abstract class Material implements Serializable {
     albedo: Vector3;

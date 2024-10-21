@@ -1,5 +1,5 @@
 import Material from "./material";
-import Vector3 from "./vector3";
+import Vector3 from "../vector3";
 
 export default class Metal extends Material {
     static readonly ID: number = 2;
