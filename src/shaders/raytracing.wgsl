@@ -6,6 +6,17 @@ struct Material {                               //              align(16)   size
     // -- implicit struct size padding --       // offset(24)               size(8)
 }
 
+struct Interval {                               //              align(4)    size(8)
+    min: f32,                                   // offset(0)    align(4)    size(4)
+    max: f32,                                   // offset(4)    align(4)    size(4)
+}
+
+struct AABB {                                   //              align(4)    size(24)
+    x: Interval,                                // offset(0)    align(4)    size(8)
+    y: Interval,                                // offset(8)    align(4)    size(8)
+    z: Interval,                                // offset(16)   align(4)    size(8)
+}
+
 struct Sphere {                                 //              align(16)   size(48)
     center: Ray,                                // offset(0)    align(16)   size(32)
     materialIndex: f32,                         // offset(32)   align(4)    size(4)
