@@ -12,6 +12,24 @@ export default class CameraViewData implements Serializable {
     size: number = 96;
     align: number = 16;
 
+    constructor(
+        lookFrom: Vector3,
+        pixel00Location: Vector3,
+        pixelDeltaU: Vector3,
+        pixelDeltaV: Vector3,
+        defocusDiskU: Vector3,
+        defocusDiskV: Vector3,
+        defocusAngle: number,
+    ) {
+        this.lookFrom = lookFrom;
+        this.pixel00Location = pixel00Location;
+        this.pixelDeltaU = pixelDeltaU;
+        this.pixelDeltaV = pixelDeltaV;
+        this.defocusDiskU = defocusDiskU;
+        this.defocusDiskV = defocusDiskV;
+        this.defocusAngle = defocusAngle;
+    }
+
     /**
      * align(16) size(96)
      * @returns {Float32Array}

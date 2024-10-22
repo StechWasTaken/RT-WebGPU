@@ -79,15 +79,15 @@ export default class Camera implements Serializable {
         const defocusDiskU = u.multiply(defocusRadius);
         const defocusDiskV = v.multiply(defocusRadius);
 
-        const data = new CameraViewData();
-
-        data.lookFrom = this.lookFrom;
-        data.pixel00Location = pixel00Location;
-        data.pixelDeltaU = pixelDeltaU;
-        data.pixelDeltaV = pixelDeltaV;
-        data.defocusDiskU = defocusDiskU;
-        data.defocusDiskV = defocusDiskV;
-        data.defocusAngle = this.defocusAngle;
+        const data = new CameraViewData(
+            this.lookFrom,
+            pixel00Location,
+            pixelDeltaU,
+            pixelDeltaV,
+            defocusDiskU,
+            defocusDiskV,
+            this.defocusAngle
+        );
 
         return data;
     }
@@ -105,8 +105,8 @@ export default class Camera implements Serializable {
         buffer[7] = this.defocusAngle;
         buffer.set(this.vup.encode(), 8);
         buffer[11] = this.focusDistance;
-        buffer[12] = this.imageWidth; // size(12)
-        buffer[15] = this.imageHeight;
+        buffer[12] = this.imageWidth;
+        buffer[13] = this.imageHeight;
 
         return buffer;
     }

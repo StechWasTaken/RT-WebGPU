@@ -36,8 +36,9 @@ struct Camera {                                 //              align(16)   size
     defocusAngle: f32,                          // offset(28)   align(4)    size(4)
     vup: vec3f,                                 // offset(32)   align(16)   size(12)
     focusDistance: f32,                         // offset(44)   align(4)    size(4)
-    @size(12) imageWidth: f32,                  // offset(48)   align(16)   size(12)
-    imageHeight: f32,                           // offset(60)   align(4)    size(4)
+    imageWidth: f32,                            // offset(48)   align(4)    size(4)
+    imageHeight: f32,                           // offset(52)   align(4)    size(4)
+    // -- implicit struct size padding --       // offset(56)               size(8)
 }
 
 struct CameraData {                             //              align(16)   size(96)
