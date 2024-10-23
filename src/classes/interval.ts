@@ -1,15 +1,26 @@
+import IntervalOptions from "../interfaces/interval-options";
 import Serializable from "../interfaces/serializable";
 
 export default class Interval implements Serializable {
     min: number;
     max: number;
 
-    constructor(
-        min: number = Number.POSITIVE_INFINITY,
-        max: number = Number.NEGATIVE_INFINITY,
-    ) {
-        this.min = min;
-        this.max = max;
+    constructor({
+        intervals,
+        numbers,
+    }: IntervalOptions = {}) {
+        if (intervals) {
+            const { a , b } = intervals;
+            this.min = a.min <= b.min ? a.min : b.min;
+            this.max = a.max >= b.max ? a.max : b.max;
+        } else if (numbers) {
+            const { min, max } = numbers;
+            this.min = min;
+            this.max = max;
+        } else {
+            this.min = Number.POSITIVE_INFINITY;
+            this.max = Number.NEGATIVE_INFINITY;
+        }
     }
 
     size(): number {

@@ -17,11 +17,11 @@ struct AABB {                                   //              align(4)    size
     z: Interval,                                // offset(16)   align(4)    size(8)
 }
 
-struct Sphere {                                 //              align(16)   size(48)
+struct Sphere {                                 //              align(16)   size(64)
     center: Ray,                                // offset(0)    align(16)   size(32)
     materialIndex: f32,                         // offset(32)   align(4)    size(4)
     r: f32,                                     // offset(36)   align(4)    size(4)
-    // -- implicit struct size padding --       // offset(40)               size(8)
+    bbox: AABB,                                 // offset(40)   align(4)    size(24)
 }
 
 struct Ray {                                    //              align(16)   size(32)

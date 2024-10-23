@@ -10,6 +10,7 @@ import Material from "./classes/materials/material";
 import Dielectric from "./classes/materials/dielectric";
 import Metal from "./classes/materials/metal";
 import ArrayEncoder from "./helpers/array-encoder";
+import BVHNode from "./classes/bvh-node";
 
 if (!navigator.gpu) {
     throw new Error("WebGPU not supported on this browser.");
@@ -156,7 +157,7 @@ spheres.push(new Sphere(new Vector3(4,1,0), 1, 3));
 
 const bufferReadyMaterials = ArrayEncoder.encode(materials, 8);
 
-const bufferReadySpheres = ArrayEncoder.encode(spheres, 12);
+const bufferReadySpheres = ArrayEncoder.encode(spheres, 16);
 
 const bufferReadyCameraData = camera.computeViewData().encode();
 
