@@ -10,7 +10,7 @@ import Material from "./classes/materials/material";
 import Dielectric from "./classes/materials/dielectric";
 import Metal from "./classes/materials/metal";
 import ArrayEncoder from "./helpers/array-encoder";
-import BVHNode from "./classes/bvh-node";
+import BVH from "./classes/bvh";
 
 if (!navigator.gpu) {
     throw new Error("WebGPU not supported on this browser.");
@@ -70,6 +70,13 @@ const bindGroupLayout = device.createBindGroupLayout({
                 type: "read-only-storage",
             },
         },
+        {
+            binding: 5,
+            visibility: GPUShaderStage.FRAGMENT,
+            buffer: {
+                type: "read-only-storage",
+            }
+        }
     ],
 });
 
@@ -111,7 +118,7 @@ materials.push(material1);
 materials.push(material2);
 materials.push(material3);
 
-const range = 2;
+const range = 11;
 
 for (let a = -range; a < range; a++) {
     for (let b = -range; b < range; b++) {
@@ -155,6 +162,10 @@ spheres.push(new Sphere(new Vector3(0,1,0), 1, 1));
 spheres.push(new Sphere(new Vector3(-4,1,0), 1, 2));
 spheres.push(new Sphere(new Vector3(4,1,0), 1, 3));
 
+const bvh = new BVH(spheres);
+
+const bufferReadyBVH = bvh.encode();
+
 const bufferReadyMaterials = ArrayEncoder.encode(materials, 8);
 
 const bufferReadySpheres = ArrayEncoder.encode(spheres, 16);
@@ -164,6 +175,12 @@ const bufferReadyCameraData = camera.computeViewData().encode();
 const shaderConfigBuffer = params.encode();
 
 const square = new Square().encode();
+
+const bvhStorageBuffer = device.createBuffer({
+    label: "bounding volume hierarchy",
+    size: bufferReadyBVH.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+});
 
 const paramsUniformBuffer = device.createBuffer({
     label: "shader params",
@@ -204,8 +221,9 @@ const vertexBufferLayout: GPUVertexBufferLayout = {
     }],
 };
 
-device.queue.writeBuffer(materialsStorageBuffer, 0, bufferReadyMaterials);
+device.queue.writeBuffer(bvhStorageBuffer, 0, bufferReadyBVH);
 device.queue.writeBuffer(spheresStorageBuffer, 0, bufferReadySpheres);
+device.queue.writeBuffer(materialsStorageBuffer, 0, bufferReadyMaterials);
 device.queue.writeBuffer(randomUniformBuffer, 0, randomValues);
 device.queue.writeBuffer(vertexBuffer, 0, square);
 
@@ -267,6 +285,12 @@ const bindGroup = device.createBindGroup({
             binding: 4,
             resource: {
                 buffer: materialsStorageBuffer,
+            }
+        },
+        {
+            binding: 5,
+            resource: {
+                buffer: bvhStorageBuffer,
             }
         }
     ],

@@ -3,6 +3,15 @@ import Serializable from "../interfaces/serializable";
 import Interval from "./interval";
 
 export default class AABB implements Serializable {
+    static readonly EMPTY: AABB = new AABB();
+    static readonly UNIVERSE: AABB = new AABB({
+        intervals: {
+            x: Interval.UNIVERSE,
+            y: Interval.UNIVERSE,
+            z: Interval.UNIVERSE,
+        }
+    })
+
     x: Interval;
     y: Interval;
     z: Interval;
@@ -43,6 +52,13 @@ export default class AABB implements Serializable {
             default:
                 return this.x;
         }
+    }
+
+    longestAxis(): number {
+        if (this.x.size() > this.z.size()) {
+            return this.x.size() > this.z.size() ? 0 : 2;
+        }
+        return this.y.size() > this.z.size() ? 1 : 2;
     }
 
     /**

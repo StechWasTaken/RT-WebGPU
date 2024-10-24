@@ -17,6 +17,14 @@ struct AABB {                                   //              align(4)    size
     z: Interval,                                // offset(16)   align(4)    size(8)
 }
 
+struct BVHNode {                                //              align(16)   size(48)
+    @align(16) @size(32) bbox: AABB,            // offset(0)    align(16)   size(32)
+    left: f32,                                  // offset(32)   align(4)    size(4)
+    right: f32,                                 // offset(36)   align(4)    size(4)
+    objectIndex: f32,                           // offset(40)   align(4)    size(4)
+    // -- implicit struct size padding --       // offset(44)               size(4)
+}
+
 struct Sphere {                                 //              align(16)   size(64)
     center: Ray,                                // offset(0)    align(16)   size(32)
     materialIndex: f32,                         // offset(32)   align(4)    size(4)
@@ -77,6 +85,7 @@ struct Parameters {                             //              align(4)    size
 @group(0) @binding(2) var<uniform> rng: u32;
 @group(0) @binding(3) var<uniform> params: Parameters;
 @group(0) @binding(4) var<storage, read> materials: array<Material>;
+@group(0) @binding(5) var<storage, read> bvh: array<BVHNode>;
 
 fn lcg(modulus: u32, a: u32, c: u32, seed: ptr<function, u32>) -> u32 {
     let result = (a * (*seed) + c) % modulus;
@@ -168,14 +177,19 @@ fn at(ray: Ray, t: f32) -> vec3f {
     return ray.origin + t * ray.direction;
 }
 
-fn hitSpheres(spheres: ptr<storage, array<Sphere>>, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32, rayTmax: f32) -> bool {
+fn hitSpheres(
+    ray: Ray, 
+    record: ptr<function, HitRecord>, 
+    rayTmin: f32, 
+    rayTmax: f32
+) -> bool {
     var tempRecord = HitRecord();
     var hitAnything = false;
     var closestSoFar = rayTmax;
 
     var i = 0u;
     loop {
-        if i == arrayLength(spheres) {
+        if i == arrayLength(&spheres) {
             break;
         }
 
@@ -188,6 +202,93 @@ fn hitSpheres(spheres: ptr<storage, array<Sphere>>, ray: Ray, record: ptr<functi
         }
 
         i++;
+    }
+
+    return hitAnything;
+}
+
+fn vectorAxis(v: vec3f, axis: u32) -> f32 {
+    if (axis == 1) {
+        return v.y;
+    } else if (axis == 2) {
+        return v.z;
+    }
+    return v.x;
+}
+
+fn axisInterval(bbox: AABB, axis: u32) -> Interval {
+    if (axis == 1) {
+        return bbox.y;
+    } else if (axis == 2) {
+        return bbox.z;
+    }
+    return bbox.x;
+}
+
+fn hitBbox(bbox: AABB, ray: Ray, rayT: Interval) -> bool {
+    let rayOrigin = ray.origin;
+    let rayDirection = ray.direction;
+    var rayTmin = rayT.min;
+    var rayTmax = rayT.max;
+
+    for (var axis = 0u; axis < 3u; axis++) {
+        let ax = axisInterval(bbox, axis);
+        let adinv = 1.0 / vectorAxis(rayDirection, axis);
+
+        var t0 = (ax.min - vectorAxis(rayOrigin, axis)) * adinv;
+        var t1 = (ax.max - vectorAxis(rayOrigin, axis)) * adinv;
+
+        if (t0 > t1) {
+            let temp = t0;
+            t0 = t1;
+            t1 = temp; 
+        }
+
+        rayTmin = max(t0, rayTmin);
+        rayTmax = min(t1, rayTmax);
+
+        if (rayTmax <= rayTmin) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+fn hitBVH(
+    ray: Ray, 
+    record: ptr<function, HitRecord>,
+    rayT: Interval, 
+) -> bool {
+    var tempRecord = HitRecord();
+    var stack: array<i32, 64>; // watch out for this size constant!!! (bvh depth * 2, stack size should not exceed this)
+    var stackPtr = 0;
+
+    stack[stackPtr] = i32(arrayLength(&bvh)) - 1;
+
+    var hitAnything = false;
+    var closestSoFar = rayT.max;
+
+    while (stackPtr >= 0) {
+        let currentNode = bvh[stack[stackPtr]];
+        stackPtr--;
+
+        if (hitBbox(currentNode.bbox, ray, rayT)) {
+            if (currentNode.objectIndex >= 0) {
+                // implement geometry types later...
+
+                if (hit(spheres[i32(currentNode.objectIndex)], ray, &tempRecord, rayT.min, closestSoFar)) {
+                    hitAnything = true;
+                    closestSoFar = tempRecord.t;
+                    *record = tempRecord;
+                }
+            } else {
+                stackPtr++;
+                stack[stackPtr] = i32(currentNode.left);
+                stackPtr++;
+                stack[stackPtr] = i32(currentNode.right);
+            }
+        }
     }
 
     return hitAnything;
@@ -264,7 +365,13 @@ fn refract(uv: vec3f, n: vec3f, etaIoverEtaT: f32) -> vec3f {
     return rOutPerp + rOutParallel;
 }
 
-fn hit(sphere: Sphere, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32, rayTmax: f32) -> bool {
+fn hit(
+    sphere: Sphere, 
+    ray: Ray, 
+    record: ptr<function, HitRecord>, 
+    rayTmin: f32, 
+    rayTmax: f32,
+) -> bool {
     let currentCenter = at(sphere.center, ray.time);
     let oc = currentCenter - ray.origin;
     let a = dot(ray.direction, ray.direction);
@@ -295,7 +402,10 @@ fn hit(sphere: Sphere, ray: Ray, record: ptr<function, HitRecord>, rayTmin: f32,
     return true;
 }
 
-fn rayColor(spheres: ptr<storage, array<Sphere>>, ray: Ray, seed: ptr<function, u32>) -> vec3f {
+fn rayColor(
+    ray: Ray, 
+    seed: ptr<function, u32>
+) -> vec3f {
     var color = vec3f(1.0, 1.0, 1.0);
     var currentRay = ray;
 
@@ -308,8 +418,9 @@ fn rayColor(spheres: ptr<storage, array<Sphere>>, ray: Ray, seed: ptr<function, 
         }
 
         var record = HitRecord();
+        let rayT = Interval(0.001, 1e16);
 
-        if (!hitSpheres(spheres, currentRay, &record, 0.001, 1e16)) {
+        if (!hitBVH(currentRay, &record, rayT)) {
             let unitDirection = normalize(currentRay.direction);
             let a = 0.5 * (unitDirection.y + 1.0);
             color *= (1.0 - a) * vec3f(1.0, 1.0, 1.0) + a * vec3f(0.5, 0.7, 1.0); 
@@ -345,7 +456,7 @@ fn vertexMain(@location(0) pos: vec2f) -> @builtin(position) vec4f {
 fn fragmentMain(@builtin(position) pos: vec4f) -> @location(0) vec4f {
     var seed = rng * u32(dot(pos,pos)) / u32(pos.x);
     let initRay = getRay(pos.xy, &seed);
-    var pixelColor = rayColor(&spheres, initRay, &seed);
+    var pixelColor = rayColor(initRay, &seed);
 
     let samples = u32(params.samplesPerPixel);
     var i = 0u;
@@ -356,7 +467,7 @@ fn fragmentMain(@builtin(position) pos: vec4f) -> @location(0) vec4f {
 
         let offset = sampleSquare(&seed);
         let ray = getRay(pos.xy + offset, &seed);
-        let color = rayColor(&spheres, ray, &seed);
+        let color = rayColor(ray, &seed);
 
         pixelColor += color;
 

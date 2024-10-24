@@ -2,6 +2,14 @@ import IntervalOptions from "../interfaces/interval-options";
 import Serializable from "../interfaces/serializable";
 
 export default class Interval implements Serializable {
+    static readonly EMPTY: Interval = new Interval();
+    static readonly UNIVERSE: Interval = new Interval({
+        numbers: {
+            min: Number.NEGATIVE_INFINITY,
+            max: Number.POSITIVE_INFINITY,
+        }
+    });
+
     min: number;
     max: number;
 
