@@ -1,5 +1,5 @@
 import ArrayEncoder from "../helpers/array-encoder";
-import RandomHelper from "../helpers/random-helper";
+import BVHStackEntry from "../interfaces/bvh-stack-entry";
 import Hittable from "../interfaces/hittable";
 import Serializable from "../interfaces/serializable";
 import AABB from "./aabb";
@@ -15,7 +15,7 @@ export default class BVH implements Serializable {
     }
 
     private build(objects: Hittable[]): void {
-        const stack: { start: number, end: number, parentIndex: number | null, isLeftChild: boolean }[] = [];
+        const stack: BVHStackEntry[] = [];
         stack.push({ start: 0, end: objects.length, parentIndex: null, isLeftChild: false });
     
         while (stack.length > 0) {
