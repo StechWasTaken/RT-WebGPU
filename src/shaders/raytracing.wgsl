@@ -264,7 +264,7 @@ fn hitBVH(
     var stack: array<i32, 64>; // watch out for this size constant!!! (bvh depth * 2, stack size should not exceed this)
     var stackPtr = 0;
 
-    stack[stackPtr] = i32(arrayLength(&bvh)) - 1;
+    stack[stackPtr] = 0;
 
     var hitAnything = false;
     var closestSoFar = rayT.max;
@@ -273,7 +273,9 @@ fn hitBVH(
         let currentNode = bvh[stack[stackPtr]];
         stackPtr--;
 
-        if (hitBbox(currentNode.bbox, ray, rayT)) {
+        let tempRayT = Interval(rayT.min, closestSoFar);
+
+        if (hitBbox(currentNode.bbox, ray, tempRayT)) {
             if (currentNode.objectIndex >= 0) {
                 // implement geometry types later...
 
