@@ -11,8 +11,6 @@ export default class Camera implements Serializable {
     focusDistance: number;
     imageWidth: number;
     imageHeight: number;
-    size: number = 64;
-    align: number = 16;
 
     constructor(
         lookFrom: Vector3,
@@ -53,6 +51,15 @@ export default class Camera implements Serializable {
         this.lookFrom.z = this.lookAt.z + radius * Math.sin(newAngle);
     }
 
+    zoom(delta: number): void {
+        const direction = this.lookFrom.subtract(this.lookAt).normalize();
+
+        const zoomSpeed = 0.01;
+        const newDistance = direction.multiply(zoomSpeed * delta);
+
+        this.lookFrom = this.lookFrom.add(newDistance);
+    }
+
     computeViewData(): CameraViewData {
         const theta = this.vfov * (Math.PI / 180.0);
         const h = Math.tan(theta / 2.0);
@@ -84,9 +91,11 @@ export default class Camera implements Serializable {
             pixel00Location,
             pixelDeltaU,
             pixelDeltaV,
+            this.imageWidth,
             defocusDiskU,
+            this.imageHeight,
             defocusDiskV,
-            this.defocusAngle
+            this.defocusAngle   
         );
 
         return data;

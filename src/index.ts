@@ -1,4 +1,5 @@
 import raytracingShader from "./shaders/raytracing.wgsl";
+import displayShader from "./shaders/display.wgsl";
 import Square from "./classes/shapes/square";
 import Sphere from "./classes/shapes/sphere";
 import RandomHelper from "./helpers/random-helper";
@@ -11,6 +12,15 @@ import Dielectric from "./classes/materials/dielectric";
 import Metal from "./classes/materials/metal";
 import ArrayEncoder from "./helpers/array-encoder";
 import BVH from "./classes/bvh";
+import Counter from "./classes/counter";
+
+let seed = Date.now();
+let lastTime = performance.now();
+let frameCount = new Counter();
+let totalFrameCount = new Counter({min: 1});
+let fps = 60;
+let fpsUpdateTime = 0;
+let angularVelocity = 0;
 
 if (!navigator.gpu) {
     throw new Error("WebGPU not supported on this browser.");
@@ -33,62 +43,7 @@ context.configure({
     format: canvasFormat,
 });
 
-const bindGroupLayout = device.createBindGroupLayout({
-    entries: [
-        {
-            binding: 0,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, // Uniform used in both stages
-            buffer: {
-                type: "uniform",
-            },
-        },
-        {
-            binding: 1,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: {
-                type: "read-only-storage",
-            },
-        },
-        {
-            binding: 2,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: {
-                type: "uniform",
-            },
-        },
-        {
-            binding: 3,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: {
-                type: "uniform",
-            },
-        },
-        {
-            binding: 4,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: {
-                type: "read-only-storage",
-            },
-        },
-        {
-            binding: 5,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: {
-                type: "read-only-storage",
-            }
-        }
-    ],
-});
-
-const seed = Date.now();
 const randomValues = new Float32Array([seed]);
-
-const randomUniformBuffer = device.createBuffer({
-    label: "RNG",
-    size: randomValues.byteLength,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-
 const spheres = new Array<Sphere>();
 const materials = new Array<Material>();
 
@@ -104,7 +59,7 @@ const camera = new Camera(
 );
 
 const params = new ShaderConfig(
-    5,
+    10,
     0,
 );
 
@@ -124,9 +79,9 @@ for (let a = -range; a < range; a++) {
     for (let b = -range; b < range; b++) {
         const chooseMaterial = Math.random();
         const center = new Vector3(
-            a * 2.5 + 0.9 * Math.random(),
+            a + 0.75 * Math.random(),
             0.2,
-            b * 1.2 + 0.9 * Math.random(),
+            b + 0.75 * Math.random(),
         );
 
         const materialIndex = materials.length;
@@ -165,16 +120,42 @@ spheres.push(new Sphere(new Vector3(4,1,0), 1, 3));
 const bvh = new BVH(spheres);
 
 const bufferReadyBVH = bvh.encode();
-
 const bufferReadyMaterials = ArrayEncoder.encode(materials, 8);
-
 const bufferReadySpheres = ArrayEncoder.encode(spheres, 16);
-
 const bufferReadyCameraData = camera.computeViewData().encode();
-
 const shaderConfigBuffer = params.encode();
-
 const square = new Square().encode();
+
+const randomUniformBuffer = device.createBuffer({
+    label: "RNG seed",
+    size: randomValues.byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+});
+
+const frameCountBuffer = device.createBuffer({
+    label: "frame count",
+    size: totalFrameCount.encode().byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+});
+
+const outputTexture = device.createTexture({
+    label: "display output texture",
+    size: [canvas.width, canvas.height],
+    format: "rgba32float",
+    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING,
+});
+
+const inputTexture = device.createTexture({
+    label: "display input texture",
+    size: [canvas.width, canvas.height],
+    format: "rgba32float",
+    usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
+});
+
+const sampler = device.createSampler({
+    magFilter: "nearest",
+    minFilter: "nearest",
+});
 
 const bvhStorageBuffer = device.createBuffer({
     label: "bounding volume hierarchy",
@@ -227,35 +208,101 @@ device.queue.writeBuffer(materialsStorageBuffer, 0, bufferReadyMaterials);
 device.queue.writeBuffer(randomUniformBuffer, 0, randomValues);
 device.queue.writeBuffer(vertexBuffer, 0, square);
 
-const squareShaderModule = device.createShaderModule({
+const computeShaderModule = device.createShaderModule({
     label: "raytracing shader",
     code: raytracingShader,
 });
 
-const pipelineLayout = device.createPipelineLayout({
-    bindGroupLayouts: [bindGroupLayout],
+const computePipeline = device.createComputePipeline({
+    label: "raytracing compute pipeline",
+    layout: device.createPipelineLayout({
+        bindGroupLayouts: [device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: "uniform",
+                    },
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: "read-only-storage",
+                    },
+                },
+                {
+                    binding: 2,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: "uniform",
+                    },
+                },
+                {
+                    binding: 3,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: "uniform",
+                    },
+                },
+                {
+                    binding: 4,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: "read-only-storage",
+                    },
+                },
+                {
+                    binding: 5,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: "read-only-storage",
+                    }
+                },
+                {
+                    binding: 6,
+                    visibility: GPUShaderStage.COMPUTE,
+                    storageTexture: {
+                        access: "write-only",
+                        format: "rgba32float"
+                    },
+                },
+                {
+                    binding: 7,
+                    visibility: GPUShaderStage.COMPUTE,
+                    texture: {
+                        sampleType: "unfilterable-float",
+                        viewDimension: "2d",
+                        multisampled: false,
+                    },
+                },
+                {
+                    binding: 8,
+                    visibility: GPUShaderStage.COMPUTE,
+                    sampler: {
+                        type: "non-filtering",
+                    },
+                },
+                {
+                    binding: 9,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: {
+                        type: "uniform",
+                    },
+                },
+            ],
+        })]
+    }),
+    compute: {
+        module: computeShaderModule,
+        entryPoint: "main",
+    },
 });
 
-const renderPipeline = device.createRenderPipeline({
-    label: "scene render pipeline",
-    layout: pipelineLayout,
-    vertex: {
-        module: squareShaderModule,
-        entryPoint: "vertexMain",
-        buffers: [vertexBufferLayout],
-    },
-    fragment: {
-        module: squareShaderModule,
-        entryPoint: "fragmentMain",
-        targets: [{
-            format: canvasFormat,
-        }],
-    },
-});
-
-const bindGroup = device.createBindGroup({
-    label: "scene renderer bind group",
-    layout: renderPipeline.getBindGroupLayout(0),
+const computeBindGroup = device.createBindGroup({
+    label: "compute raytracing bind group",
+    layout: computePipeline.getBindGroupLayout(0),
     entries: [
         {
             binding: 0,
@@ -292,22 +339,92 @@ const bindGroup = device.createBindGroup({
             resource: {
                 buffer: bvhStorageBuffer,
             }
+        },
+        {
+            binding: 6,
+            resource: outputTexture.createView(),
+        },
+        {
+            binding: 7,
+            resource: inputTexture.createView(),
+        },
+        {
+            binding: 8,
+            resource: sampler,
+        },
+        {
+            binding: 9,
+            resource: {
+                buffer: frameCountBuffer,
+            }
         }
     ],
 });
 
-let lastTime = performance.now();
-let frameCount = 0;
-let fps = 60;
-let fpsUpdateTime = 0;
-let angularVelocity = 0;
+const displayShaderModule = device.createShaderModule({
+    label: "display shader",
+    code: displayShader,
+})
+
+const displayPipeline = device.createRenderPipeline({
+    label: "render pipeline",
+    layout: device.createPipelineLayout({
+        bindGroupLayouts: [device.createBindGroupLayout({
+            entries: [
+                {
+                    binding: 0,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    texture: {
+                        sampleType: "unfilterable-float",
+                        viewDimension: "2d",
+                        multisampled: false,
+                    }
+                },
+                {
+                    binding: 1,
+                    visibility: GPUShaderStage.FRAGMENT,
+                    sampler: {
+                        type: "non-filtering",
+                    }
+                }
+            ]
+        })]
+    }),
+    vertex: {
+        module: displayShaderModule,
+        entryPoint: "vertexMain",
+        buffers: [vertexBufferLayout],
+    },
+    fragment: {
+        module: displayShaderModule,
+        entryPoint: "fragmentMain",
+        targets: [
+            {
+                format: canvasFormat,
+            }
+        ]
+    }
+});
+
+const displayBindGroup = device.createBindGroup({
+    label: "display bind group",
+    layout: displayPipeline.getBindGroupLayout(0),
+    entries: [
+        {
+            binding: 0,
+            resource: outputTexture.createView(),
+        },
+        {
+            binding: 1,
+            resource: sampler,
+        }
+    ]
+});
 
 const fpsCounter = document.querySelector("#fps-counter");
 const maxBouncesInput = document.querySelector("#max-bounces");
-const samplesPerPixelInput = document.querySelector('#samples-per-pixel');
 const rotationSpeedInput = document.querySelector('#rotation-speed');
 const labelMaxBouncesInput = document.querySelector("#label-max-bounces");
-const labelSamplesPerPixelInput = document.querySelector("#label-samples-per-pixel");
 const labelRotationSpeedInput = document.querySelector("#label-rotation-speed");
 
 maxBouncesInput.addEventListener('input', function(event) {
@@ -315,13 +432,7 @@ maxBouncesInput.addEventListener('input', function(event) {
     params.maxBounces = parseInt(target.value);
     const text = target.value.padStart(2, ' ');
     labelMaxBouncesInput.textContent = `MAX BOUNCES PER RAY: ${text}x`;
-});
-
-samplesPerPixelInput.addEventListener('input', function(event) {
-    const target = event.target as HTMLInputElement;
-    params.samplesPerPixel = parseInt(target.value);
-    const text = target.value.padStart(2, ' ');
-    labelSamplesPerPixelInput.textContent = `SAMPLES PER PIXEL: ${text}x`;
+    totalFrameCount.reset();
 });
 
 rotationSpeedInput.addEventListener('input', function(event) {
@@ -330,32 +441,64 @@ rotationSpeedInput.addEventListener('input', function(event) {
     angularVelocity = value * Math.PI / 180;
     const text = value.toString().padStart(3, ' ');
     labelRotationSpeedInput.textContent = `ROTATION SPEED: ${text} deg p/s`
+    totalFrameCount.reset();
+});
+
+canvas.addEventListener('wheel', function(event) {
+    camera.zoom(event.deltaY);
+    totalFrameCount.reset();
 });
 
 function render(time: DOMHighResTimeStamp) {
     const deltaTime = time - lastTime;
     lastTime = time;
 
-    frameCount++;
-
     fpsUpdateTime += deltaTime;
 
     if (fpsUpdateTime >= 1000) {
-        fps = frameCount;
-        frameCount = 0;
+        fps = frameCount.count;
+        frameCount.reset();
         fpsUpdateTime = 0;
         fpsCounter.textContent = `FPS: ${fps}`;
     }
     
     camera.rotate(angularVelocity, deltaTime);
 
+    if (angularVelocity !== 0) {
+        totalFrameCount.reset();
+    }
+
     const cameraViewData = camera.computeViewData().encode();
     const shaderConfig = params.encode();
+    const seed = performance.now();
 
+    device.queue.writeBuffer(frameCountBuffer, 0, totalFrameCount.encode());
+    device.queue.writeBuffer(randomUniformBuffer, 0, new Float32Array([seed]));
     device.queue.writeBuffer(cameraViewDataUniformBuffer, 0, cameraViewData);
     device.queue.writeBuffer(paramsUniformBuffer, 0, shaderConfig);
 
     const encoder = device.createCommandEncoder();
+
+    const computePass = encoder.beginComputePass();
+    
+    computePass.setPipeline(computePipeline);
+    computePass.setBindGroup(0, computeBindGroup);
+    computePass.dispatchWorkgroups(
+        Math.ceil(canvas.width / 8),
+        Math.ceil(canvas.height / 8),
+    );
+
+    computePass.end();
+
+    encoder.copyTextureToTexture(
+        {
+            texture: outputTexture,
+        },
+        {
+            texture: inputTexture,
+        },
+        [canvas.width, canvas.height],
+    )
 
     const pass = encoder.beginRenderPass({
         colorAttachments: [{
@@ -365,14 +508,17 @@ function render(time: DOMHighResTimeStamp) {
         }]
     });
 
-    pass.setPipeline(renderPipeline);
+    pass.setPipeline(displayPipeline);
     pass.setVertexBuffer(0, vertexBuffer);
-    pass.setBindGroup(0, bindGroup);
+    pass.setBindGroup(0, displayBindGroup);
     pass.draw(square.length / 2);
 
     pass.end();
 
     device.queue.submit([encoder.finish()]);
+
+    frameCount.up();
+    totalFrameCount.up();
 
     requestAnimationFrame(render);
 }

@@ -68,9 +68,9 @@ struct CameraData {                             //              align(16)   size
     pixelDeltaU: vec3f,                         // offset(32)   align(16)   size(12)
     // -- implicit member alignment padding --  // offset(44)               size(4)                   
     pixelDeltaV: vec3f,                         // offset(48)   align(16)   size(12)   
-    // -- implicit member alignment padding --  // offset(60)               size(4)
+    imageWidth: f32,                            // offset(50)   align(4)    size(4)
     defocusDiskU: vec3f,                        // offset(64)   align(16)   size(12)   
-    // -- implicit member alignment padding --  // offset(76)               size(4)
+    imageHeight: f32,                           // offset(76)   align(4)    size(4)
     defocusDiskV: vec3f,                        // offset(80)   align(16)   size(12)
     defocusAngle: f32,                          // offset(92)   align(4)    size(4)    
 }
@@ -86,9 +86,13 @@ struct Parameters {                             //              align(4)    size
 @group(0) @binding(3) var<uniform> params: Parameters;
 @group(0) @binding(4) var<storage, read> materials: array<Material>;
 @group(0) @binding(5) var<storage, read> bvh: array<BVHNode>;
+@group(0) @binding(6) var outputTexture: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(7) var inputTexture: texture_2d<f32>;
+@group(0) @binding(8) var colorSampler: sampler;
+@group(0) @binding(9) var<uniform> frameCount: f32;
 
 fn lcg(modulus: u32, a: u32, c: u32, seed: ptr<function, u32>) -> u32 {
-    let result = (a * (*seed) + c) % modulus;
+    var result = (a * (*seed) + c) % modulus;
     *seed = result;
     return result;
 }
@@ -449,34 +453,30 @@ fn luminance(color: vec3f) -> f32 {
     return dot(color, vec3f(0.299, 0.587, 0.114));
 }
 
-@vertex
-fn vertexMain(@location(0) pos: vec2f) -> @builtin(position) vec4f {
-    return vec4f(pos, 0, 1);
-}
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) global_id: vec3u) {
+    let x = f32(global_id.x);
+    let y = f32(global_id.y);
 
-@fragment
-fn fragmentMain(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-    var seed = rng * u32(dot(pos,pos)) / u32(pos.x);
-    let initRay = getRay(pos.xy, &seed);
-    var pixelColor = rayColor(initRay, &seed);
-
-    let samples = u32(params.samplesPerPixel);
-    var i = 0u;
-    loop {
-        if i == samples {
-            break;
-        }
-
-        let offset = sampleSquare(&seed);
-        let ray = getRay(pos.xy + offset, &seed);
-        let color = rayColor(ray, &seed);
-
-        pixelColor += color;
-
-        i++;
+    if (x >= cameraData.imageWidth || y >= cameraData.imageHeight) {
+        return;
     }
 
-    pixelColor /= params.samplesPerPixel + 1;
+    let currentColor = textureLoad(inputTexture, global_id.xy, 0);
 
-    return vec4f(sqrt(pixelColor), 1);
+    let pos = vec4f(x, y, 0, 1);
+    var seed = rng ^ u32(dot(currentColor.xy + pos.xy + frameCount, currentColor.xy + pos.xy + frameCount)) ^ (u32(frameCount) << 10);
+    let offset = sampleSquare(&seed);
+    let ray = getRay(pos.xy + offset, &seed);
+    let color = rayColor(ray, &seed);
+
+    let newColor = vec4f(sqrt(color), 1.0);
+
+    let texCoord = pos.xy / vec2f(1920, 1080);
+
+
+    let ratio = 1.0 / frameCount;
+    let blendedColor = currentColor * (1.0 - ratio) + newColor * ratio;
+
+    textureStore(outputTexture, global_id.xy, blendedColor);
 }
