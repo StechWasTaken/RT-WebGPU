@@ -14,7 +14,7 @@ import ArrayEncoder from "./helpers/array-encoder";
 import BVH from "./classes/bvh";
 import Counter from "./classes/counter";
 
-let seed = Date.now();
+let seed = new Counter({min: 0, overflow: true});
 let lastTime = performance.now();
 let frameCount = new Counter();
 let totalFrameCount = new Counter({min: 1});
@@ -43,7 +43,7 @@ context.configure({
     format: canvasFormat,
 });
 
-const randomValues = new Float32Array([seed]);
+const randomValues = seed.encode();
 const spheres = new Array<Sphere>();
 const materials = new Array<Material>();
 
@@ -470,10 +470,10 @@ function render(time: DOMHighResTimeStamp) {
 
     const cameraViewData = camera.computeViewData().encode();
     const shaderConfig = params.encode();
-    const seed = performance.now();
+    seed.up(Math.floor(performance.now()));
 
     device.queue.writeBuffer(frameCountBuffer, 0, totalFrameCount.encode());
-    device.queue.writeBuffer(randomUniformBuffer, 0, new Float32Array([seed]));
+    device.queue.writeBuffer(randomUniformBuffer, 0, seed.encode());
     device.queue.writeBuffer(cameraViewDataUniformBuffer, 0, cameraViewData);
     device.queue.writeBuffer(paramsUniformBuffer, 0, shaderConfig);
 

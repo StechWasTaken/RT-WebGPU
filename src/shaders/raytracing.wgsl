@@ -82,7 +82,7 @@ struct Parameters {                             //              align(4)    size
 
 @group(0) @binding(0) var<uniform> cameraData: CameraData;
 @group(0) @binding(1) var<storage, read> spheres: array<Sphere>;
-@group(0) @binding(2) var<uniform> rng: u32;
+@group(0) @binding(2) var<uniform> rng: f32;
 @group(0) @binding(3) var<uniform> params: Parameters;
 @group(0) @binding(4) var<storage, read> materials: array<Material>;
 @group(0) @binding(5) var<storage, read> bvh: array<BVHNode>;
@@ -465,7 +465,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3u) {
     let currentColor = textureLoad(inputTexture, global_id.xy, 0);
 
     let pos = vec4f(x, y, 0, 1);
-    var seed = rng ^ u32(dot(currentColor.xy + pos.xy + frameCount, currentColor.xy + pos.xy + frameCount)) ^ (u32(frameCount) << 10);
+    var seed = u32(rng) ^ u32(dot(currentColor.xy + pos.xy + frameCount, currentColor.xy + pos.xy + frameCount)) ^ (u32(frameCount) << 10);
     let offset = sampleSquare(&seed);
     let ray = getRay(pos.xy + offset, &seed);
     let color = rayColor(ray, &seed);
