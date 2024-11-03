@@ -1,4 +1,4 @@
-import CounterOptions from "../interfaces/counter-options";
+import CounterOptions from "../interfaces/options/counter-options";
 import Serializable from "../interfaces/serializable";
 
 export default class Counter implements Serializable {

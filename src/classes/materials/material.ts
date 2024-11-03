@@ -1,4 +1,4 @@
-import MaterialOptions from "../../interfaces/material-options";
+import MaterialOptions from "../../interfaces/options/material-options";
 import Serializable from "../../interfaces/serializable";
 import Vector3 from "../vector3";
 

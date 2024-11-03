@@ -1,4 +1,4 @@
-import GeometryOptions from "../../interfaces/geometry-options";
+import GeometryOptions from "../../interfaces/options/geometry-options";
 import Hittable from "../../interfaces/hittable";
 import Serializable from "../../interfaces/serializable";
 import AABB from "../aabb";

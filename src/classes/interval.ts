@@ -1,4 +1,4 @@
-import IntervalOptions from "../interfaces/interval-options";
+import IntervalOptions from "../interfaces/options/interval-options";
 import Serializable from "../interfaces/serializable";
 
 export default class Interval implements Serializable {
