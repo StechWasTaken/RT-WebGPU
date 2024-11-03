@@ -15,7 +15,7 @@ export default abstract class Geometry implements Serializable, Hittable {
     id: number;
 
     constructor({
-        center = new Ray(Vector3.ZERO, Vector3.ZERO, 0),
+        center = Ray.ZERO,
         r = 0,
         materialIndex,
         bbox,

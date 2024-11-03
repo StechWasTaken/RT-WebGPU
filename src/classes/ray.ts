@@ -2,6 +2,8 @@ import Serializable from "../interfaces/serializable";
 import Vector3 from "./vector3";
 
 export default class Ray implements Serializable {
+    static readonly ZERO: Ray = new Ray(Vector3.ZERO, Vector3.ZERO, 0);
+
     origin: Vector3;
     time: number;
     direction: Vector3;
