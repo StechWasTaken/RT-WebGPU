@@ -3,13 +3,15 @@ import Serializable from "../../interfaces/serializable";
 import Vector3 from "../vector3";
 
 export default abstract class Material implements Serializable {
+    static readonly SIZE: number = 8;
+
     albedo: Vector3;
     fuzz: number;
     refractionIndex: number;
     id: number;
 
     constructor({
-        albedo = new Vector3(0, 0, 0),
+        albedo = Vector3.ZERO,
         fuzz = 0,
         refractionIndex = 0,
         id,
@@ -21,11 +23,11 @@ export default abstract class Material implements Serializable {
     }
 
     /**
-     * align(16) size(24)
+     * align(16) size(32)
      * @returns {Float32Array}
      */
     encode(): Float32Array {
-        const buffer = new Float32Array(8);
+        const buffer = new Float32Array(Material.SIZE);
 
         buffer.set(this.albedo.encode(), 0);
         buffer[3] = this.fuzz;

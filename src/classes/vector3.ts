@@ -2,6 +2,8 @@ import Serializable from "../interfaces/serializable";
 import Vector from "../interfaces/vector";
 
 export default class Vector3 implements Serializable, Vector<Vector3> {
+    static readonly ZERO: Vector3 = new Vector3(0,0,0);
+
     x: number;
     y: number;
     z: number;

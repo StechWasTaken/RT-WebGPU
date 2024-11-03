@@ -13,10 +13,11 @@ import Metal from "./classes/materials/metal";
 import ArrayEncoder from "./helpers/array-encoder";
 import BVH from "./classes/bvh";
 import Counter from "./classes/counter";
+import Geometry from "./classes/shapes/geometry";
 
 let seed = new Counter({min: 0, overflow: true});
-let lastTime = performance.now();
-let frameCount = new Counter();
+let time = new Counter({min: 0, overflow: true});
+let frameCount = new Counter({min: 0});
 let totalFrameCount = new Counter({min: 1});
 let fps = 60;
 let fpsUpdateTime = 0;
@@ -44,7 +45,7 @@ context.configure({
 });
 
 const randomValues = seed.encode();
-const spheres = new Array<Sphere>();
+const objects = new Array<Geometry>();
 const materials = new Array<Material>();
 
 const camera = new Camera(
@@ -89,7 +90,7 @@ for (let a = -range; a < range; a++) {
         if (center.subtract(new Vector3(4,0.2,0)).magnitude() > 0.9) {
             const sphere = new Sphere(center, 0.2, materialIndex);
 
-            spheres.push(sphere);
+            objects.push(sphere);
 
             if (chooseMaterial < 0.8) { // diffuse
                 const randomVector = RandomHelper.randomVector3();
@@ -112,16 +113,16 @@ for (let a = -range; a < range; a++) {
     }
 }
 
-spheres.push(new Sphere(new Vector3(0,-1000,0), 1000, 0));
-spheres.push(new Sphere(new Vector3(0,1,0), 1, 1));
-spheres.push(new Sphere(new Vector3(-4,1,0), 1, 2));
-spheres.push(new Sphere(new Vector3(4,1,0), 1, 3));
+objects.push(new Sphere(new Vector3(0,-1000,0), 1000, 0));
+objects.push(new Sphere(new Vector3(0,1,0), 1, 1));
+objects.push(new Sphere(new Vector3(-4,1,0), 1, 2));
+objects.push(new Sphere(new Vector3(4,1,0), 1, 3));
 
-const bvh = new BVH(spheres);
+const bvh = new BVH(objects);
 
 const bufferReadyBVH = bvh.encode();
-const bufferReadyMaterials = ArrayEncoder.encode(materials, 8);
-const bufferReadySpheres = ArrayEncoder.encode(spheres, 16);
+const bufferReadyMaterials = ArrayEncoder.encode(materials, Material.SIZE);
+const bufferReadyObjects = ArrayEncoder.encode(objects, Geometry.SIZE);
 const bufferReadyCameraData = camera.computeViewData().encode();
 const shaderConfigBuffer = params.encode();
 const square = new Square().encode();
@@ -175,9 +176,9 @@ const cameraViewDataUniformBuffer = device.createBuffer({
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 })
 
-const spheresStorageBuffer = device.createBuffer({
-    label: "sphere instances",
-    size: bufferReadySpheres.byteLength,
+const geometryStorageBuffer = device.createBuffer({
+    label: "geometry instances",
+    size: bufferReadyObjects.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 });
 
@@ -203,7 +204,7 @@ const vertexBufferLayout: GPUVertexBufferLayout = {
 };
 
 device.queue.writeBuffer(bvhStorageBuffer, 0, bufferReadyBVH);
-device.queue.writeBuffer(spheresStorageBuffer, 0, bufferReadySpheres);
+device.queue.writeBuffer(geometryStorageBuffer, 0, bufferReadyObjects);
 device.queue.writeBuffer(materialsStorageBuffer, 0, bufferReadyMaterials);
 device.queue.writeBuffer(randomUniformBuffer, 0, randomValues);
 device.queue.writeBuffer(vertexBuffer, 0, square);
@@ -313,7 +314,7 @@ const computeBindGroup = device.createBindGroup({
         {
             binding: 1,
             resource: {
-                buffer: spheresStorageBuffer,
+                buffer: geometryStorageBuffer,
             }
         },
         {
@@ -449,11 +450,10 @@ canvas.addEventListener('wheel', function(event) {
     totalFrameCount.reset();
 });
 
-function render(time: DOMHighResTimeStamp) {
-    const deltaTime = time - lastTime;
-    lastTime = time;
+function render(currentTime: DOMHighResTimeStamp) {
+    time.set(currentTime);
 
-    fpsUpdateTime += deltaTime;
+    fpsUpdateTime += time.delta();
 
     if (fpsUpdateTime >= 1000) {
         fps = frameCount.count;
@@ -462,7 +462,7 @@ function render(time: DOMHighResTimeStamp) {
         fpsCounter.textContent = `FPS: ${fps}`;
     }
     
-    camera.rotate(angularVelocity, deltaTime);
+    camera.rotate(angularVelocity, time.delta());
 
     if (angularVelocity !== 0) {
         totalFrameCount.reset();
@@ -470,7 +470,7 @@ function render(time: DOMHighResTimeStamp) {
 
     const cameraViewData = camera.computeViewData().encode();
     const shaderConfig = params.encode();
-    seed.up(Math.floor(performance.now()));
+    seed.set(Math.floor(performance.now()));
 
     device.queue.writeBuffer(frameCountBuffer, 0, totalFrameCount.encode());
     device.queue.writeBuffer(randomUniformBuffer, 0, seed.encode());
