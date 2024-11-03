@@ -27,7 +27,6 @@ export default {
     },
 
     plugins: [
-        new webpack.HotModuleReplacementPlugin(),
         new HtmlWebpackPlugin({
             template: './index.html',
             inject: false,
