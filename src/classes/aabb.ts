@@ -1,4 +1,4 @@
-import AABBOptions from "../interfaces/aabb-options";
+import AABBOptions from "../interfaces/options/aabb-options";
 import Serializable from "../interfaces/serializable";
 import Interval from "./interval";
 
