@@ -14,6 +14,7 @@ import ArrayEncoder from "./helpers/array-encoder";
 import BVH from "./classes/bvh";
 import Counter from "./classes/counter";
 import Geometry from "./classes/shapes/geometry";
+import Quad from "./classes/shapes/quad";
 
 let seed = new Counter({min: 0, overflow: true});
 let time = new Counter({min: 0, overflow: true});

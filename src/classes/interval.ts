@@ -35,6 +35,16 @@ export default class Interval implements Serializable {
         return this.max - this.min;
     }
 
+    expand(delta: number): Interval {
+        const padding = delta / 2;
+        return new Interval({
+            numbers: {
+                min: this.min - padding,
+                max: this.max + padding,
+            }
+        });
+    }
+
     contains(x: number): boolean {
         return this.min <= x && x <= this.max;
     }

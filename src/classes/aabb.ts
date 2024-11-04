@@ -41,6 +41,8 @@ export default class AABB implements Serializable {
             this.y = new Interval();
             this.z = new Interval();
         }
+
+        this.padToMinimums();
     }
 
     axisInterval(n: number): Interval {
@@ -59,6 +61,13 @@ export default class AABB implements Serializable {
             return this.x.size() > this.z.size() ? 0 : 2;
         }
         return this.y.size() > this.z.size() ? 1 : 2;
+    }
+
+    padToMinimums(): void {
+        const delta = 0.0001;
+        this.x = this.x.size() < delta ? this.x.expand(delta) : this.x;
+        this.y = this.y.size() < delta ? this.y.expand(delta) : this.y;
+        this.z = this.z.size() < delta ? this.z.expand(delta) : this.z;
     }
 
     /**

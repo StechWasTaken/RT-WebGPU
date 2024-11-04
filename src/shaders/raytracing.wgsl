@@ -25,11 +25,21 @@ struct BVHNode {                                //              align(16)   size
     // -- implicit struct size padding --       // offset(44)               size(4)
 }
 
-struct Sphere {                                 //              align(16)   size(64)
+struct Geometry {                               //              align(16)   size(144)
     center: Ray,                                // offset(0)    align(16)   size(32)
     materialIndex: f32,                         // offset(32)   align(4)    size(4)
     r: f32,                                     // offset(36)   align(4)    size(4)
     bbox: AABB,                                 // offset(40)   align(4)    size(24)
+    Q: vec3f,                                   // offset(64)   align(16)   size(12)
+    id: f32,                                    // offset(76)   align(4)    size(4)
+    u: vec3f,                                   // offset(80)   align(16)   size(12)
+    // -- implicit member alignment padding --  // offset(92)               size(4)
+    v: vec3f,                                   // offset(96)   align(16)   size(12)
+    // -- implicit member alignment padding --  // offset(108)              size(4)
+    normal: vec3f,                              // offset(112)  align(16)   size(12)
+    D: f32,                                     // offset(124)  align(4)    size(4)
+    w: vec3f,                                   // offset(128)  align(16)   size(12)
+    // -- implicit struct size padding --       // offset(140)              size(4)
 }
 
 struct Ray {                                    //              align(16)   size(32)
@@ -44,8 +54,10 @@ struct HitRecord {                              //              align(16)   size
     t: f32,                                     // offset(12)   align(4)    size(4)
     normal: vec3f,                              // offset(16)   align(16)   size(12)
     materialIndex: f32,                         // offset(28)   align(4)    size(4)
-    frontFace: bool,                            // offset(32)   align(1)    size(1)
-    // -- implicit struct size padding --       // offset(33)               size(11)
+    @align(4) @size(4) frontFace: bool,         // offset(32)   align(4)    size(4)
+    u: f32,                                     // offset(36)   align(4)    size(4)
+    v: f32,                                     // offset(40)   align(4)    size(4)
+    // -- implicit struct size padding --       // offset(44)               size(4)
 }
 
 struct Camera {                                 //              align(16)   size(64)
@@ -81,7 +93,7 @@ struct Parameters {                             //              align(4)    size
 }
 
 @group(0) @binding(0) var<uniform> cameraData: CameraData;
-@group(0) @binding(1) var<storage, read> spheres: array<Sphere>;
+@group(0) @binding(1) var<storage, read> objects: array<Geometry>;
 @group(0) @binding(2) var<uniform> rng: f32;
 @group(0) @binding(3) var<uniform> params: Parameters;
 @group(0) @binding(4) var<storage, read> materials: array<Material>;
@@ -141,13 +153,12 @@ fn randomOnHemisphere(normal: vec3f, seed: ptr<function, u32>) -> vec3f {
     }
 }
 
-fn setFaceNormal(record: ptr<function, HitRecord>, rayDirection: vec3f, outwardNormal: vec3f) {
-    let a = dot(rayDirection, outwardNormal);
-    if (a < 0) {
-        record.frontFace = true;
+fn setFaceNormal(record: ptr<function, HitRecord>, ray: Ray, outwardNormal: vec3f) {
+    record.frontFace = dot(ray.direction, outwardNormal) < 0;
+
+    if (record.frontFace) {
         record.normal = outwardNormal;
     } else {
-        record.frontFace = false;
         record.normal = -outwardNormal;
     }
 }
@@ -193,13 +204,13 @@ fn hitSpheres(
 
     var i = 0u;
     loop {
-        if i == arrayLength(&spheres) {
+        if i == arrayLength(&objects) {
             break;
         }
 
-        let sphere = spheres[i];
+        let object = objects[i];
 
-        if (hit(sphere, ray, &tempRecord, rayTmin, closestSoFar)) {
+        if (hitSphere(object, ray, &tempRecord, rayTmin, closestSoFar)) {
             hitAnything = true;
             closestSoFar = tempRecord.t;
             *record = tempRecord;
@@ -282,11 +293,21 @@ fn hitBVH(
         if (hitBbox(currentNode.bbox, ray, tempRayT)) {
             if (currentNode.objectIndex >= 0) {
                 // implement geometry types later...
-
-                if (hit(spheres[i32(currentNode.objectIndex)], ray, &tempRecord, rayT.min, closestSoFar)) {
-                    hitAnything = true;
-                    closestSoFar = tempRecord.t;
-                    *record = tempRecord;
+                let index = i32(currentNode.objectIndex);
+                let object = objects[index];
+                
+                if (object.id == 1) {
+                    if (hitSphere(object, ray, &tempRecord, rayT.min, closestSoFar)) {
+                        hitAnything = true;
+                        closestSoFar = tempRecord.t;
+                        *record = tempRecord;
+                    }
+                } else if (object.id == 2) {
+                    if (hitQuad(object, ray, &tempRecord, tempRayT)) {
+                        hitAnything = true;
+                        closestSoFar = tempRecord.t;
+                        *record = tempRecord;
+                    }
                 }
             } else {
                 stackPtr++;
@@ -371,8 +392,8 @@ fn refract(uv: vec3f, n: vec3f, etaIoverEtaT: f32) -> vec3f {
     return rOutPerp + rOutParallel;
 }
 
-fn hit(
-    sphere: Sphere, 
+fn hitSphere(
+    sphere: Geometry, 
     ray: Ray, 
     record: ptr<function, HitRecord>, 
     rayTmin: f32, 
@@ -402,10 +423,65 @@ fn hit(
     record.t = root;
     record.p = at(ray, record.t);
     let outwardNormal = normalize(record.p - currentCenter);
-    setFaceNormal(record, ray.direction, outwardNormal);
+    setFaceNormal(record, ray, outwardNormal);
     record.materialIndex = sphere.materialIndex;
 
     return true;
+}
+
+fn hitQuad(
+    quad: Geometry,
+    ray: Ray,
+    record: ptr<function, HitRecord>,
+    rayT: Interval,
+) -> bool {
+    let denominator = dot(quad.normal, ray.direction);
+
+    if (abs(denominator) < 1e-8) {
+        return false;
+    }
+
+    let t = (quad.D - dot(quad.normal, ray.origin)) / denominator;
+    if (!contains(rayT, t)) {
+        return false;
+    }
+
+    let intersection = at(ray, t);
+    let planarHitptVector = intersection - quad.Q;
+    let alpha = dot(quad.w, cross(planarHitptVector, quad.v));
+    let beta = dot(quad.w, cross(quad.u, planarHitptVector));
+
+    if (!isInterior(alpha, beta, record)) {
+        return false;
+    }
+
+    record.t = t;
+    record.p = intersection;
+    record.materialIndex = quad.materialIndex;
+    setFaceNormal(record, ray, quad.normal);
+
+    return true;
+}
+
+fn isInterior(
+    a: f32, 
+    b: f32, 
+    record: ptr<function, HitRecord>
+) -> bool {
+    const unitInterval = Interval(0, 1);
+
+    if (!contains(unitInterval, a) || !contains(unitInterval, b)) {
+        return false;
+    }
+
+    record.u = a;
+    record.v = b;
+
+    return true;
+}
+
+fn contains(interval: Interval, x: f32) -> bool {
+    return interval.min <= x && x <= interval.max;
 }
 
 fn rayColor(
