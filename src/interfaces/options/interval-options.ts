@@ -1,4 +1,4 @@
-import Interval from "../classes/interval";
+import Interval from "../../classes/interval"
 
 export default interface IntervalOptions {
     intervals?: {

@@ -1,4 +1,4 @@
-import Vector3 from "../classes/vector3";
+import Vector3 from "../../classes/vector3";
 
 export default interface MaterialOptions {
     id: number;

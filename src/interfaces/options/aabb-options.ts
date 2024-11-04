@@ -1,6 +1,6 @@
-import AABB from "../classes/aabb"
-import Interval from "../classes/interval"
-import Vector3 from "../classes/vector3"
+import AABB from "../../classes/aabb"
+import Interval from "../../classes/interval"
+import Vector3 from "../../classes/vector3"
 
 export default interface AABBOptions {
     intervals?: {
