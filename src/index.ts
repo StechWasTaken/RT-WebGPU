@@ -511,8 +511,8 @@ function render(time: DOMHighResTimeStamp) {
     computePass.setPipeline(computePipeline);
     computePass.setBindGroup(0, computeBindGroup);
     computePass.dispatchWorkgroups(
-        Math.ceil(canvas.width / 8),
-        Math.ceil(canvas.height / 8),
+        Math.ceil(canvas.width / 16),
+        Math.ceil(canvas.height / 4),
     );
 
     computePass.end();
