@@ -32,7 +32,7 @@ if (!adapter) {
     throw new Error("No appropriate GPUAdapter found.");
 }
 
-const canvas = document.querySelector("canvas");
+const canvas: HTMLCanvasElement = document.querySelector("canvas");
 
 const DEFAULT_MAX_BUFFER_LIMIT = 268435456;
 let device: GPUDevice;
@@ -52,7 +52,7 @@ if (Object.keys(requestedLimits).length > 0) {
     device = await adapter.requestDevice();
 }
 
-const context = canvas.getContext("webgpu");
+const context: GPUCanvasContext = canvas.getContext("webgpu");
 const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
 
 context.configure({
@@ -450,9 +450,7 @@ const displayBindGroup = device.createBindGroup({
 
 const fpsCounter = document.querySelector("#fps-counter");
 const maxBouncesInput = document.querySelector("#max-bounces");
-const rotationSpeedInput = document.querySelector("#rotation-speed");
 const labelMaxBouncesInput = document.querySelector("#label-max-bounces");
-const labelRotationSpeedInput = document.querySelector("#label-rotation-speed");
 
 maxBouncesInput.addEventListener("input", function (event) {
     const target = event.target as HTMLInputElement;
@@ -462,17 +460,50 @@ maxBouncesInput.addEventListener("input", function (event) {
     totalFrameCount.reset();
 });
 
-rotationSpeedInput.addEventListener("input", function (event) {
-    const target = event.target as HTMLInputElement;
-    const value = parseInt(target.value);
-    angularVelocity = (value * Math.PI) / 180;
-    const text = value.toString().padStart(3, " ");
-    labelRotationSpeedInput.textContent = `ROTATION SPEED: ${text} deg p/s`;
+canvas.addEventListener("wheel", function (event) {
+    camera.zoom(event.deltaY);
     totalFrameCount.reset();
 });
 
-canvas.addEventListener("wheel", function (event) {
-    camera.zoom(event.deltaY);
+canvas.addEventListener("click", function () {
+    if ((canvas as any).requestPointerLock) {
+        (canvas as any).requestPointerLock();
+    }
+});
+
+function onPointerLockChange() {
+    if (document.pointerLockElement === canvas) {
+        document.addEventListener("mousemove", pointerMoveHandler);
+    } else {
+        document.removeEventListener("mousemove", pointerMoveHandler);
+    }
+}
+
+function pointerMoveHandler(e: MouseEvent) {
+    camera.applyMouseDelta(e.movementX, e.movementY);
+    totalFrameCount.reset();
+}
+
+document.addEventListener("pointerlockchange", onPointerLockChange);
+
+const keysPressed = new Set<string>();
+const moveSpeed = 5;
+
+window.addEventListener("keydown", function (event) {
+    const key = (event.key || "").toLowerCase();
+    if (["w", "a", "s", "d", " ", "shift"].includes(key)) {
+        if (key === " ") keysPressed.add("space");
+        else keysPressed.add(key === "shift" ? "shift" : key);
+        if (typeof event.preventDefault === "function") event.preventDefault();
+        totalFrameCount.reset();
+    }
+});
+
+window.addEventListener("keyup", function (event) {
+    const key = (event.key || "").toLowerCase();
+    if (key === " ") keysPressed.delete("space");
+    else if (key === "shift") keysPressed.delete("shift");
+    else keysPressed.delete(key);
     totalFrameCount.reset();
 });
 
@@ -489,7 +520,24 @@ function render(time: DOMHighResTimeStamp) {
         fpsCounter.textContent = `FPS: ${fps}`;
     }
 
-    camera.rotate(angularVelocity, deltaTime);
+    if (keysPressed.size > 0) {
+        const dt = deltaTime / 1000;
+
+        let xMove = 0;
+        let zMove = 0;
+        let yMove = 0;
+        if (keysPressed.has("w")) zMove += 1;
+        if (keysPressed.has("s")) zMove -= 1;
+        if (keysPressed.has("d")) xMove += 1;
+        if (keysPressed.has("a")) xMove -= 1;
+        if (keysPressed.has("space")) yMove += 1;
+        if (keysPressed.has("shift")) yMove -= 1;
+
+        if (xMove !== 0 || yMove !== 0 || zMove !== 0) {
+            camera.moveFPS(xMove, yMove, zMove, dt, moveSpeed);
+            totalFrameCount.reset();
+        }
+    }
 
     if (angularVelocity !== 0) {
         totalFrameCount.reset();
