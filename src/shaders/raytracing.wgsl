@@ -48,31 +48,19 @@ struct HitRecord {                              //              align(16)   size
     // -- implicit struct size padding --       // offset(33)               size(11)
 }
 
-struct Camera {                                 //              align(16)   size(64)
-    lookFrom: vec3f,                            // offset(0)    align(16)   size(12)
-    fvov: f32,                                  // offset(12)   align(4)    size(4)
-    lookAt: vec3f,                              // offset(16)   align(16)   size(12)
-    defocusAngle: f32,                          // offset(28)   align(4)    size(4)
-    vup: vec3f,                                 // offset(32)   align(16)   size(12)
-    focusDistance: f32,                         // offset(44)   align(4)    size(4)
-    imageWidth: f32,                            // offset(48)   align(4)    size(4)
-    imageHeight: f32,                           // offset(52)   align(4)    size(4)
-    // -- implicit struct size padding --       // offset(56)               size(8)
-}
-
 struct CameraData {                             //              align(16)   size(96)
     lookFrom: vec3f,                            // offset(0)    align(16)   size(12)
     // -- implicit member alignment padding --  // offset(12)               size(4)
     pixel00Location: vec3f,                     // offset(16)   align(16)   size(12)
-    // -- implicit member alignment padding --  // offset(28)               size(4)   
+    // -- implicit member alignment padding --  // offset(28)               size(4)
     pixelDeltaU: vec3f,                         // offset(32)   align(16)   size(12)
-    // -- implicit member alignment padding --  // offset(44)               size(4)                   
-    pixelDeltaV: vec3f,                         // offset(48)   align(16)   size(12)   
+    // -- implicit member alignment padding --  // offset(44)               size(4)
+    pixelDeltaV: vec3f,                         // offset(48)   align(16)   size(12)
     imageWidth: f32,                            // offset(50)   align(4)    size(4)
-    defocusDiskU: vec3f,                        // offset(64)   align(16)   size(12)   
+    defocusDiskU: vec3f,                        // offset(64)   align(16)   size(12)
     imageHeight: f32,                           // offset(76)   align(4)    size(4)
     defocusDiskV: vec3f,                        // offset(80)   align(16)   size(12)
-    defocusAngle: f32,                          // offset(92)   align(4)    size(4)    
+    defocusAngle: f32,                          // offset(92)   align(4)    size(4)
 }
 
 struct Parameters {                             //              align(4)    size(8)
@@ -91,59 +79,97 @@ struct Parameters {                             //              align(4)    size
 @group(0) @binding(8) var colorSampler: sampler;
 @group(0) @binding(9) var<uniform> frameCount: f32;
 
-fn lcg(modulus: u32, a: u32, c: u32, seed: ptr<function, u32>) -> u32 {
-    var result = (a * (*seed) + c) % modulus;
-    *seed = result;
-    return result;
-}
-
-fn random(seed: ptr<function, u32>) -> f32 {
+fn lcg_wrap(seed: ptr<function, u32>) -> u32 {
     let a = 1664525u;
     let c = 1013904223u;
-    let m = 0xFFFFFFFFu;
+    let res = a * (*seed) + c;
+    *seed = res;
+    return res;
+}
 
-    let result = lcg(m, a, c, seed);
-
-    return f32(result) / f32(m);
+fn random_f32(seed: ptr<function, u32>) -> f32 {
+    let r = lcg_wrap(seed);
+    return f32(r) / 4294967296.0;
 }
 
 fn randomRange(seed: ptr<function, u32>, min: f32, max: f32) -> f32 {
-    return random(seed) * (max - min) + min;
+    return random_f32(seed) * (max - min) + min;
 }
 
-fn randomUnitVector(seed: ptr<function, u32>) -> vec3f {
-    let theta = 2 * 3.14159 * random(seed);
-    let phi = acos(2 * random(seed) - 1);
+fn hash_u32(x: u32) -> u32 {
+    var v = x;
+    v = (v + 0x7ed55d16u) + (v << 12);
+    v = (v ^ 0xc761c23cu) ^ (v >> 19);
+    v = (v + 0x165667b1u) + (v << 5);
+    v = (v + 0xd3a2646cu) ^ (v << 9);
+    v = (v + 0xfd7046c5u) + (v << 3);
+    v = (v ^ 0xb55a4f09u) ^ (v >> 16);
+    return v;
+}
 
-    let x = sin(phi) * cos(theta);
-    let y = sin(phi) * sin(theta);
-    let z = cos(phi);
-
-    return vec3f(x, y, z);
+fn sampleSquare(seed: ptr<function, u32>) -> vec2f {
+    return vec2f(random_f32(seed) - 0.5, random_f32(seed) - 0.5);
 }
 
 fn randomInUnitDisk(seed: ptr<function, u32>) -> vec3f {
-    let theta = 2 * 3.14159 * random(seed);
-    let r = sqrt(random(seed));
-
+    let theta = 2.0 * 3.14159265359 * random_f32(seed);
+    let r = sqrt(max(0.0, random_f32(seed)));
     let x = r * cos(theta);
     let y = r * sin(theta);
-
-    return vec3f(x, y, 0);
+    return vec3f(x, y, 0.0);
 }
 
-fn randomOnHemisphere(normal: vec3f, seed: ptr<function, u32>) -> vec3f {
-    let onUnitSphere = randomUnitVector(seed);
-    if (dot(onUnitSphere, normal) > 0.0) {
-        return onUnitSphere;
-    } else {
-        return -onUnitSphere;
+fn randomInHemisphereCosine(normal: vec3f, seed: ptr<function, u32>) -> vec3f {
+    let r1 = random_f32(seed);
+    let r2 = random_f32(seed);
+    let phi = 2.0 * 3.14159265359 * r1;
+    let r = sqrt(max(0.0, r2));
+    let x = r * cos(phi);
+    let y = r * sin(phi);
+    let z = sqrt(max(0.0, 1.0 - r2)); // cos(theta)
+
+    // Build an orthonormal basis (u, v, w) with w = normal
+    var w = normalize(normal);
+    var a = vec3f(0.0, 1.0, 0.0);
+    if (abs(w.y) > 0.9) {
+        a = vec3f(1.0, 0.0, 0.0);
     }
+    var v = normalize(cross(w, a));
+    var u = cross(w, v);
+
+    let sample = u * x + v * y + w * z;
+    return normalize(sample);
+}
+
+fn nearZero(e: vec3f) -> bool {
+    let s = 1e-8;
+    return (abs(e.x) < s) && (abs(e.y) < s) && (abs(e.z) < s);
+}
+
+fn reflect(v: vec3f, n: vec3f) -> vec3f {
+    return v - 2.0 * dot(v, n) * n;
+}
+
+fn refract(uv: vec3f, n: vec3f, etaIoverEtaT: f32) -> vec3f {
+    let cosTheta = min(dot(-uv, n), 1.0);
+    let rOutPerp = etaIoverEtaT * (uv + cosTheta * n);
+    let rOutParallel = -sqrt(abs(1.0 - dot(rOutPerp, rOutPerp))) * n;
+    return rOutPerp + rOutParallel;
+}
+
+fn reflectance(cosine: f32, refractionIndex: f32) -> f32 {
+    var r0 = (1.0 - refractionIndex) / (1.0 + refractionIndex);
+    r0 = r0 * r0;
+    return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
+}
+
+fn at(ray: Ray, t: f32) -> vec3f {
+    return ray.origin + t * ray.direction;
 }
 
 fn setFaceNormal(record: ptr<function, HitRecord>, rayDirection: vec3f, outwardNormal: vec3f) {
     let a = dot(rayDirection, outwardNormal);
-    if (a < 0) {
+    if (a < 0.0) {
         record.frontFace = true;
         record.normal = outwardNormal;
     } else {
@@ -152,63 +178,42 @@ fn setFaceNormal(record: ptr<function, HitRecord>, rayDirection: vec3f, outwardN
     }
 }
 
-fn getRay(pos: vec2f, seed: ptr<function, u32>) -> Ray {
-    let center = cameraData.lookFrom;
-
-    let pixelSample = cameraData.pixel00Location + pos.x * cameraData.pixelDeltaU + pos.y * cameraData.pixelDeltaV;
-    var rayOrigin: vec3f;
-    if (cameraData.defocusAngle <= 0) {
-        rayOrigin = center;
-    } else {
-        rayOrigin = defocusDiskSample(seed, center);
-    }
-    let rayDirection = pixelSample - rayOrigin;
-    let rayTime = random(seed);
-
-    return Ray(rayOrigin, rayTime, rayDirection);
-}
-
-fn sampleSquare(seed: ptr<function, u32>) -> vec2f {
-    return vec2f(random(seed) - 0.5, random(seed) - 0.5);
-}
-
-fn defocusDiskSample(seed: ptr<function, u32>, center: vec3f) -> vec3f {
-    let p = randomInUnitDisk(seed);
-    return center + (p.x * cameraData.defocusDiskU) + (p.y * cameraData.defocusDiskV);
-}
-
-fn at(ray: Ray, t: f32) -> vec3f {
-    return ray.origin + t * ray.direction;
-}
-
-fn hitSpheres(
-    ray: Ray, 
-    record: ptr<function, HitRecord>, 
-    rayTmin: f32, 
-    rayTmax: f32
+fn hit(
+    sphere: Sphere,
+    ray: Ray,
+    record: ptr<function, HitRecord>,
+    rayTmin: f32,
+    rayTmax: f32,
 ) -> bool {
-    var tempRecord = HitRecord();
-    var hitAnything = false;
-    var closestSoFar = rayTmax;
+    let currentCenter = at(sphere.center, ray.time);
+    let oc = currentCenter - ray.origin;
+    let a = dot(ray.direction, ray.direction);
+    let h = dot(ray.direction, oc);
+    let c = dot(oc, oc) - sphere.r * sphere.r;
 
-    var i = 0u;
-    loop {
-        if i == arrayLength(&spheres) {
-            break;
-        }
-
-        let sphere = spheres[i];
-
-        if (hit(sphere, ray, &tempRecord, rayTmin, closestSoFar)) {
-            hitAnything = true;
-            closestSoFar = tempRecord.t;
-            *record = tempRecord;
-        }
-
-        i++;
+    let discriminant = h * h - a * c;
+    if (discriminant < 0.0) {
+        return false;
     }
 
-    return hitAnything;
+    let sqrtd = sqrt(discriminant);
+    let invA = 1.0 / a;
+
+    var root = (h - sqrtd) * invA;
+    if (root <= rayTmin || rayTmax <= root) {
+        root = (h + sqrtd) * invA;
+        if (root <= rayTmin || rayTmax <= root) {
+            return false;
+        }
+    }
+
+    record.t = root;
+    record.p = at(ray, record.t);
+    let outwardNormal = normalize(record.p - currentCenter);
+    setFaceNormal(record, ray.direction, outwardNormal);
+    record.materialIndex = sphere.materialIndex;
+
+    return true;
 }
 
 fn vectorAxis(v: vec3f, axis: u32) -> f32 {
@@ -245,7 +250,7 @@ fn hitBbox(bbox: AABB, ray: Ray, rayT: Interval) -> bool {
         if (t0 > t1) {
             let temp = t0;
             t0 = t1;
-            t1 = temp; 
+            t1 = temp;
         }
 
         rayTmin = max(t0, rayTmin);
@@ -260,9 +265,9 @@ fn hitBbox(bbox: AABB, ray: Ray, rayT: Interval) -> bool {
 }
 
 fn hitBVH(
-    ray: Ray, 
+    ray: Ray,
     record: ptr<function, HitRecord>,
-    rayT: Interval, 
+    rayT: Interval,
 ) -> bool {
     var tempRecord = HitRecord();
     var stack: array<i32, 64>; // watch out for this size constant!!! (bvh depth * 2, stack size should not exceed this)
@@ -304,8 +309,8 @@ fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: ptr<function, Hit
     let index = u32(record.materialIndex);
     let material = &materials[index];
 
-    if (material.id == 1) { // lambertian
-        var scatterDirection = record.normal + randomUnitVector(seed);
+    if (material.id == 1.0) { // lambertian
+        var scatterDirection = randomInHemisphereCosine(record.normal, seed);
 
         if (nearZero(scatterDirection)) {
             scatterDirection = record.normal;
@@ -314,13 +319,13 @@ fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: ptr<function, Hit
         *scattered = Ray(record.p, incomingRay.time, scatterDirection);
         *attenuation = material.albedo;
     }
-    else if (material.id == 2) { // metal
-        var reflected = reflect(incomingRay.direction, record.normal);
-        reflected = normalize(reflected) + (material.fuzz * randomUnitVector(seed));
+    else if (material.id == 2.0) { // metal
+        var reflected = reflect(normalize(incomingRay.direction), record.normal);
+        reflected = reflected + material.fuzz * randomInHemisphereCosine(record.normal, seed);
         *scattered = Ray(record.p, incomingRay.time, reflected);
         *attenuation = material.albedo;
     }
-    else if (material.id == 3) { // dielectric
+    else if (material.id == 3.0) { // dielectric
         *attenuation = vec3f(1.0, 1.0, 1.0);
 
         var ri = material.refractionIndex;
@@ -332,94 +337,35 @@ fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: ptr<function, Hit
         let unitDirection = normalize(incomingRay.direction);
 
         let cosTheta = min(dot(-unitDirection, record.normal), 1.0);
-        let sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+        let sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
 
         let cannotRefract = ri * sinTheta > 1.0;
         var direction: vec3f;
 
-        if (cannotRefract || reflectance(cosTheta, ri) > random(seed)) {
+        if (cannotRefract || reflectance(cosTheta, ri) > random_f32(seed)) {
             direction = reflect(unitDirection, record.normal);
         } else {
             direction = refract(unitDirection, record.normal, ri);
         }
 
-        *scattered = Ray(record.p, incomingRay.time, direction); 
+        *scattered = Ray(record.p, incomingRay.time, direction);
     }
-
-    return true;
-}
-
-fn nearZero(e: vec3f) -> bool {
-    let s = 1e-8;
-    return (abs(e.x) < s) && (abs(e.y) < s) && (abs(e.z) < s);
-}
-
-fn reflect(v: vec3f, n: vec3f) -> vec3f {
-    return v - 2 * dot(v, n) * n;
-}
-
-fn reflectance(cosine: f32, refractionIndex: f32) -> f32 {
-    var r0 = (1 - refractionIndex) / (1 + refractionIndex);
-    r0 *= r0;
-    return r0 + (1 - r0) * pow((1 - cosine), 5);
-}
-
-fn refract(uv: vec3f, n: vec3f, etaIoverEtaT: f32) -> vec3f {
-    let cosTheta = min(dot(-uv, n), 1.0);
-    let rOutPerp = etaIoverEtaT * (uv + cosTheta * n);
-    let rOutParallel = -sqrt(abs(1.0 - dot(rOutPerp, rOutPerp))) * n;
-    return rOutPerp + rOutParallel;
-}
-
-fn hit(
-    sphere: Sphere, 
-    ray: Ray, 
-    record: ptr<function, HitRecord>, 
-    rayTmin: f32, 
-    rayTmax: f32,
-) -> bool {
-    let currentCenter = at(sphere.center, ray.time);
-    let oc = currentCenter - ray.origin;
-    let a = dot(ray.direction, ray.direction);
-    let h = dot(ray.direction, oc);
-    let c = dot(oc, oc) - sphere.r * sphere.r;
-
-    let discriminant = h * h - a * c;
-    if (discriminant < 0) {
-        return false;
-    }
-    
-    let sqrtd = sqrt(discriminant);
-
-    var root = (h - sqrtd) / a;
-    if (root <= rayTmin || rayTmax <= root) {
-        root = (h + sqrtd) / a;
-        if (root <= rayTmin || rayTmax <= root) {
-            return false;
-        }
-    }
-
-    record.t = root;
-    record.p = at(ray, record.t);
-    let outwardNormal = normalize(record.p - currentCenter);
-    setFaceNormal(record, ray.direction, outwardNormal);
-    record.materialIndex = sphere.materialIndex;
 
     return true;
 }
 
 fn rayColor(
-    ray: Ray, 
+    ray: Ray,
     seed: ptr<function, u32>
 ) -> vec3f {
     var color = vec3f(1.0, 1.0, 1.0);
     var currentRay = ray;
 
     let maxBounces = u32(params.maxBounces);
-    var i: u32 = 0;
-    
+    var i: u32 = 0u;
+
     loop {
-        if i == maxBounces {
+        if (i == maxBounces) {
             break;
         }
 
@@ -429,7 +375,7 @@ fn rayColor(
         if (!hitBVH(currentRay, &record, rayT)) {
             let unitDirection = normalize(currentRay.direction);
             let a = 0.5 * (unitDirection.y + 1.0);
-            color *= (1.0 - a) * vec3f(1.0, 1.0, 1.0) + a * vec3f(0.5, 0.7, 1.0); 
+            color = color * ((1.0 - a) * vec3f(1.0, 1.0, 1.0) + a * vec3f(0.5, 0.7, 1.0));
             break;
         }
 
@@ -453,30 +399,49 @@ fn luminance(color: vec3f) -> f32 {
     return dot(color, vec3f(0.299, 0.587, 0.114));
 }
 
-@compute @workgroup_size(8, 8)
+@compute @workgroup_size(16, 4)
 fn main(@builtin(global_invocation_id) global_id: vec3u) {
-    let x = f32(global_id.x);
-    let y = f32(global_id.y);
+    let gx = global_id.x;
+    let gy = global_id.y;
+    let x = f32(gx);
+    let y = f32(gy);
 
     if (x >= cameraData.imageWidth || y >= cameraData.imageHeight) {
         return;
     }
 
-    let currentColor = textureLoad(inputTexture, global_id.xy, 0);
+    let coord = vec2<i32>(i32(gx), i32(gy));
+    let currentColor = textureLoad(inputTexture, coord, 0);
 
-    let pos = vec4f(x, y, 0, 1);
-    var seed = rng ^ u32(dot(currentColor.xy + pos.xy + frameCount, currentColor.xy + pos.xy + frameCount)) ^ (u32(frameCount) << 10);
+    let packed = gx + (gy << 16);
+    let fc = u32(frameCount);
+    var seed = rng ^ hash_u32(packed + fc);
+
+    let pos = vec2f(x, y);
+
     let offset = sampleSquare(&seed);
-    let ray = getRay(pos.xy + offset, &seed);
+    let samplePos = pos + offset;
+
+    let center = cameraData.lookFrom;
+    let pixelSample = cameraData.pixel00Location + samplePos.x * cameraData.pixelDeltaU + samplePos.y * cameraData.pixelDeltaV;
+
+    var rayOrigin: vec3f;
+    if (cameraData.defocusAngle <= 0.0) {
+        rayOrigin = center;
+    } else {
+        let d = randomInUnitDisk(&seed);
+        rayOrigin = center + d.x * cameraData.defocusDiskU + d.y * cameraData.defocusDiskV;
+    }
+    let rayDirection = pixelSample - rayOrigin;
+    let rayTime = random_f32(&seed);
+    let ray = Ray(rayOrigin, rayTime, rayDirection);
+
     let color = rayColor(ray, &seed);
 
     let newColor = vec4f(sqrt(color), 1.0);
 
-    let texCoord = pos.xy / vec2f(1920, 1080);
-
-
     let ratio = 1.0 / frameCount;
     let blendedColor = currentColor * (1.0 - ratio) + newColor * ratio;
 
-    textureStore(outputTexture, global_id.xy, blendedColor);
+    textureStore(outputTexture, coord, blendedColor);
 }

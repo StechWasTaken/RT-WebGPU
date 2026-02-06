@@ -2,12 +2,12 @@ import Serializable from "../interfaces/serializable";
 import Vector3 from "./vector3";
 
 export default class CameraViewData implements Serializable {
-    lookFrom: Vector3 = new Vector3(0,0,0);
-    pixel00Location: Vector3 = new Vector3(0,0,0);
-    pixelDeltaU: Vector3 = new Vector3(0,0,0);
-    pixelDeltaV: Vector3 = new Vector3(0,0,0);
-    defocusDiskU: Vector3 = new Vector3(0,0,0);
-    defocusDiskV: Vector3 = new Vector3(0,0,0);
+    lookFrom: Vector3 = new Vector3(0, 0, 0);
+    pixel00Location: Vector3 = new Vector3(0, 0, 0);
+    pixelDeltaU: Vector3 = new Vector3(0, 0, 0);
+    pixelDeltaV: Vector3 = new Vector3(0, 0, 0);
+    defocusDiskU: Vector3 = new Vector3(0, 0, 0);
+    defocusDiskV: Vector3 = new Vector3(0, 0, 0);
     defocusAngle: number = 0;
     imageHeight: number = 0;
     imageWidth: number = 0;
