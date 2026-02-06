@@ -13,19 +13,19 @@ export default class Vector3 implements Serializable, Vector<Vector3> {
     }
 
     add(other: number | Vector3): Vector3 {
-        if (typeof other === 'number') {
+        if (typeof other === "number") {
             other = new Vector3(other, other, other);
         }
 
         return new Vector3(
-            this.x + other.x, 
-            this.y + other.y, 
+            this.x + other.x,
+            this.y + other.y,
             this.z + other.z,
         );
     }
 
     subtract(other: number | Vector3): Vector3 {
-        if (typeof other === 'number') {
+        if (typeof other === "number") {
             other = new Vector3(other, other, other);
         }
 
@@ -37,7 +37,7 @@ export default class Vector3 implements Serializable, Vector<Vector3> {
     }
 
     divide(other: number | Vector3): Vector3 {
-        if (typeof other === 'number') {
+        if (typeof other === "number") {
             other = new Vector3(other, other, other);
         }
 
@@ -49,7 +49,7 @@ export default class Vector3 implements Serializable, Vector<Vector3> {
     }
 
     multiply(other: number | Vector3): Vector3 {
-        if (typeof other === 'number') {
+        if (typeof other === "number") {
             other = new Vector3(other, other, other);
         }
 
@@ -75,11 +75,7 @@ export default class Vector3 implements Serializable, Vector<Vector3> {
     }
 
     negate(): Vector3 {
-        return new Vector3(
-            -this.x,
-            -this.y,
-            -this.z,
-        );
+        return new Vector3(-this.x, -this.y, -this.z);
     }
 
     dot(other: Vector3): number {
@@ -91,7 +87,7 @@ export default class Vector3 implements Serializable, Vector<Vector3> {
             this.y * other.z - this.z * other.y,
             this.z * other.x - this.x * other.z,
             this.x * other.y - this.y * other.x,
-        )
+        );
     }
 
     /**

@@ -6,7 +6,7 @@ export default class Lambertian extends Material {
 
     constructor(albedo: Vector3) {
         super({
-            albedo: albedo, 
+            albedo: albedo,
             id: Lambertian.ID,
         });
     }

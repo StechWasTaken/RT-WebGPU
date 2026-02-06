@@ -64,15 +64,15 @@ struct CameraData {                             //              align(16)   size
     lookFrom: vec3f,                            // offset(0)    align(16)   size(12)
     // -- implicit member alignment padding --  // offset(12)               size(4)
     pixel00Location: vec3f,                     // offset(16)   align(16)   size(12)
-    // -- implicit member alignment padding --  // offset(28)               size(4)   
+    // -- implicit member alignment padding --  // offset(28)               size(4)
     pixelDeltaU: vec3f,                         // offset(32)   align(16)   size(12)
-    // -- implicit member alignment padding --  // offset(44)               size(4)                   
-    pixelDeltaV: vec3f,                         // offset(48)   align(16)   size(12)   
+    // -- implicit member alignment padding --  // offset(44)               size(4)
+    pixelDeltaV: vec3f,                         // offset(48)   align(16)   size(12)
     imageWidth: f32,                            // offset(50)   align(4)    size(4)
-    defocusDiskU: vec3f,                        // offset(64)   align(16)   size(12)   
+    defocusDiskU: vec3f,                        // offset(64)   align(16)   size(12)
     imageHeight: f32,                           // offset(76)   align(4)    size(4)
     defocusDiskV: vec3f,                        // offset(80)   align(16)   size(12)
-    defocusAngle: f32,                          // offset(92)   align(4)    size(4)    
+    defocusAngle: f32,                          // offset(92)   align(4)    size(4)
 }
 
 struct Parameters {                             //              align(4)    size(8)
@@ -182,9 +182,9 @@ fn at(ray: Ray, t: f32) -> vec3f {
 }
 
 fn hitSpheres(
-    ray: Ray, 
-    record: ptr<function, HitRecord>, 
-    rayTmin: f32, 
+    ray: Ray,
+    record: ptr<function, HitRecord>,
+    rayTmin: f32,
     rayTmax: f32
 ) -> bool {
     var tempRecord = HitRecord();
@@ -245,7 +245,7 @@ fn hitBbox(bbox: AABB, ray: Ray, rayT: Interval) -> bool {
         if (t0 > t1) {
             let temp = t0;
             t0 = t1;
-            t1 = temp; 
+            t1 = temp;
         }
 
         rayTmin = max(t0, rayTmin);
@@ -260,9 +260,9 @@ fn hitBbox(bbox: AABB, ray: Ray, rayT: Interval) -> bool {
 }
 
 fn hitBVH(
-    ray: Ray, 
+    ray: Ray,
     record: ptr<function, HitRecord>,
-    rayT: Interval, 
+    rayT: Interval,
 ) -> bool {
     var tempRecord = HitRecord();
     var stack: array<i32, 64>; // watch out for this size constant!!! (bvh depth * 2, stack size should not exceed this)
@@ -343,7 +343,7 @@ fn scatter(seed: ptr<function, u32>, incomingRay: Ray, record: ptr<function, Hit
             direction = refract(unitDirection, record.normal, ri);
         }
 
-        *scattered = Ray(record.p, incomingRay.time, direction); 
+        *scattered = Ray(record.p, incomingRay.time, direction);
     }
 
     return true;
@@ -372,10 +372,10 @@ fn refract(uv: vec3f, n: vec3f, etaIoverEtaT: f32) -> vec3f {
 }
 
 fn hit(
-    sphere: Sphere, 
-    ray: Ray, 
-    record: ptr<function, HitRecord>, 
-    rayTmin: f32, 
+    sphere: Sphere,
+    ray: Ray,
+    record: ptr<function, HitRecord>,
+    rayTmin: f32,
     rayTmax: f32,
 ) -> bool {
     let currentCenter = at(sphere.center, ray.time);
@@ -388,7 +388,7 @@ fn hit(
     if (discriminant < 0) {
         return false;
     }
-    
+
     let sqrtd = sqrt(discriminant);
 
     var root = (h - sqrtd) / a;
@@ -409,7 +409,7 @@ fn hit(
 }
 
 fn rayColor(
-    ray: Ray, 
+    ray: Ray,
     seed: ptr<function, u32>
 ) -> vec3f {
     var color = vec3f(1.0, 1.0, 1.0);
@@ -417,7 +417,7 @@ fn rayColor(
 
     let maxBounces = u32(params.maxBounces);
     var i: u32 = 0;
-    
+
     loop {
         if i == maxBounces {
             break;
@@ -429,7 +429,7 @@ fn rayColor(
         if (!hitBVH(currentRay, &record, rayT)) {
             let unitDirection = normalize(currentRay.direction);
             let a = 0.5 * (unitDirection.y + 1.0);
-            color *= (1.0 - a) * vec3f(1.0, 1.0, 1.0) + a * vec3f(0.5, 0.7, 1.0); 
+            color *= (1.0 - a) * vec3f(1.0, 1.0, 1.0) + a * vec3f(0.5, 0.7, 1.0);
             break;
         }
 

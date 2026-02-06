@@ -7,18 +7,15 @@ export default class Interval implements Serializable {
         numbers: {
             min: Number.NEGATIVE_INFINITY,
             max: Number.POSITIVE_INFINITY,
-        }
+        },
     });
 
     min: number;
     max: number;
 
-    constructor({
-        intervals,
-        numbers,
-    }: IntervalOptions = {}) {
+    constructor({ intervals, numbers }: IntervalOptions = {}) {
         if (intervals) {
-            const { a , b } = intervals;
+            const { a, b } = intervals;
             this.min = a.min <= b.min ? a.min : b.min;
             this.max = a.max >= b.max ? a.max : b.max;
         } else if (numbers) {

@@ -4,7 +4,7 @@ import Vector3 from "./vector3";
 
 export default class Camera implements Serializable {
     lookFrom: Vector3;
-    lookAt: Vector3
+    lookAt: Vector3;
     vup: Vector3;
     vfov: number;
     defocusAngle: number;
@@ -33,11 +33,11 @@ export default class Camera implements Serializable {
     }
 
     rotate(angularVelocity: number, deltaTime: number): void {
-        const angle = angularVelocity * deltaTime / 1000;
+        const angle = (angularVelocity * deltaTime) / 1000;
 
         const radius = Math.sqrt(
             Math.pow(this.lookFrom.x - this.lookAt.x, 2) +
-            Math.pow(this.lookFrom.z - this.lookAt.z, 2)
+                Math.pow(this.lookFrom.z - this.lookAt.z, 2),
         );
 
         const currentAngle = Math.atan2(
@@ -64,7 +64,8 @@ export default class Camera implements Serializable {
         const theta = this.vfov * (Math.PI / 180.0);
         const h = Math.tan(theta / 2.0);
         const viewportHeight = 2.0 * h * this.focusDistance;
-        const viewportWidth = viewportHeight * (this.imageWidth / this.imageHeight);
+        const viewportWidth =
+            viewportHeight * (this.imageWidth / this.imageHeight);
 
         const w = this.lookFrom.subtract(this.lookAt).normalize();
         const u = this.vup.cross(w).normalize();
@@ -76,13 +77,18 @@ export default class Camera implements Serializable {
         const pixelDeltaU = viewportU.divide(this.imageWidth);
         const pixelDeltaV = viewportV.divide(this.imageHeight);
 
-        const viewportUpperLeft = this.lookFrom.subtract(w.multiply(this.focusDistance))
+        const viewportUpperLeft = this.lookFrom
+            .subtract(w.multiply(this.focusDistance))
             .subtract(viewportU.divide(2.0))
             .subtract(viewportV.divide(2.0));
 
-        const pixel00Location = viewportUpperLeft.add(pixelDeltaU.add(pixelDeltaV).multiply(0.5));
+        const pixel00Location = viewportUpperLeft.add(
+            pixelDeltaU.add(pixelDeltaV).multiply(0.5),
+        );
 
-        const defocusRadius = this.focusDistance * Math.tan((this.defocusAngle * (Math.PI / 180.0)) / 2);
+        const defocusRadius =
+            this.focusDistance *
+            Math.tan((this.defocusAngle * (Math.PI / 180.0)) / 2);
         const defocusDiskU = u.multiply(defocusRadius);
         const defocusDiskV = v.multiply(defocusRadius);
 
@@ -95,12 +101,12 @@ export default class Camera implements Serializable {
             defocusDiskU,
             this.imageHeight,
             defocusDiskV,
-            this.defocusAngle   
+            this.defocusAngle,
         );
 
         return data;
     }
-    
+
     /**
      * align(16) size(64)
      * @returns {Float32Array}

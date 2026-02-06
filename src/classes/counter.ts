@@ -15,8 +15,16 @@ export default class Counter implements Serializable {
         min = Counter.MIN_SAFE_32F_INTEGER,
         max = Counter.MAX_SAFE_32F_INTEGER,
     }: CounterOptions = {}) {
-        this.min = Counter.clamp(min, Counter.MIN_SAFE_32F_INTEGER, Counter.MAX_SAFE_32F_INTEGER);
-        this.max = Counter.clamp(max, Counter.MIN_SAFE_32F_INTEGER, Counter.MAX_SAFE_32F_INTEGER);
+        this.min = Counter.clamp(
+            min,
+            Counter.MIN_SAFE_32F_INTEGER,
+            Counter.MAX_SAFE_32F_INTEGER,
+        );
+        this.max = Counter.clamp(
+            max,
+            Counter.MIN_SAFE_32F_INTEGER,
+            Counter.MAX_SAFE_32F_INTEGER,
+        );
         this.start = Counter.clamp(start, min, max);
         this.count = this.start;
     }

@@ -6,10 +6,6 @@ export default class RandomHelper {
     }
 
     static randomVector3(min: number = 0, max: number = 1): Vector3 {
-        return new Vector3(
-            Math.random(),
-            Math.random(),
-            Math.random(),
-        )
+        return new Vector3(Math.random(), Math.random(), Math.random());
     }
 }

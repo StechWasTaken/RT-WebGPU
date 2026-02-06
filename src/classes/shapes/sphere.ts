@@ -11,7 +11,7 @@ export default class Sphere implements Serializable, Hittable {
     bbox: AABB;
 
     constructor(center: Vector3, r: number, materialIndex: number) {
-        const direction = new Vector3(0,0,0);
+        const direction = new Vector3(0, 0, 0);
         this.center = new Ray(center, direction, 0);
         this.materialIndex = materialIndex;
         this.r = r;
@@ -22,8 +22,8 @@ export default class Sphere implements Serializable, Hittable {
             points: {
                 a: center.subtract(rvec),
                 b: center.add(rvec),
-            }
-        }); 
+            },
+        });
     }
 
     /**
